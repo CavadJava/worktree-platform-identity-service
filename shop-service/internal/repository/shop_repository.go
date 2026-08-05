@@ -81,7 +81,7 @@ func (r *ShopRepository) Update(ctx context.Context, id, name, description strin
 	const q = `
 		UPDATE shops SET name = $2, description = $3, updated_at = now()
 		WHERE id = $1
-		RETURNING id, owner_id, name, COALESCE(description, ''), temporary, created_at, updated_at
+		RETURNING id, owner_id, name, COALESCE(description, ''), temporary, shop_seq, created_at, updated_at
 	`
 	s := &models.Shop{}
 	err := r.db.QueryRowContext(ctx, q, id, name, description).Scan(
