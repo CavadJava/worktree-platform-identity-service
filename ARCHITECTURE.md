@@ -55,6 +55,7 @@
 | shop-order-service           | 8089 | sifariş yaratma/siyahı                                 | var, `orders`/`order_items` sxemlərinin sahibi + `users`/`shops`/`products`-ı oxuyur | authorization-service |
 | localization-service          | 8090 | çoxdilli mətn/xəta mesajları (az/en/ru)                | var, `translations` sxeminin sahibi | authorization-service |
 | log-service                    | 8091 | mərkəzi log anbarı (bütün servislərin request logları) | var, `service_logs` sxeminin sahibi | - |
+| shop-category-service          | 8092 | sistem-səviyyəli kataloq (kateqoriya/alt-kateqoriya)   | var, `categories`/`subcategories` sxemlərinin sahibi | authorization-service |
 
 ## Niyə belə bölündü
 
@@ -109,6 +110,10 @@ Bir `Product` (məs. "Bayraq") öz `price`/`stock`-una əlavə olaraq, hər biri
 
 Mağaza sahibi öz mağazası üçün taksonomiya təyin edə bilər: `ProductType` (növ, məs. "Ölçü") mağaza-scoped-dir, `ProductSubtype` (alt növ, məs. "En", "Uzunluq") isə valideyn növə bağlıdır (`ON DELETE CASCADE`). `Product`-un opsional `product_type_id`-si onu bir növə etiketləyir — göstərilən növ mütləq məhsulun öz mağazasına aid olmalıdır (əks halda `400 bad_request`). Yaratma/yeniləmə `add-product(2)`+, silmə `review(3)`+ tələb edir — eyni icazə modeli (`ProductItem`/`Product` ilə eyni).
 
+## Kataloq: kateqoriyalar / alt-kateqoriyalar ([shop-category-service](shop-category-service), :8092)
+
+Sistem-səviyyəli gəzinti kataloqu — `categories` (məs. "Women's Fashion") və `subcategories` (məs. "Women's Dresses", `ON DELETE CASCADE`). Yalnız administrator idarə edir, oxumaq public-dir. ID-lər oxunaqlı slug-lardır (`women-fashion`) — startup-da 10 kateqoriya + 57 alt-kateqoriyalıq default kataloq idempotent seed edilir (admin redaktələri əzilmir), `id` verilmədən yaradılanda addan avtomatik slug düzəldilir. Mağaza-scoped `product_types`/`product_subtypes`-dən fərqlidir: o, hər mağazanın öz daxili taksonomiyasıdır, bu isə bütün marketplace-in kataloq ağacıdır.
+
 ## İstifadəçi-tərəfli funksiyalar: favoritlər, abunəlik, yazışma
 
 Bunlar istənilən login olmuş istifadəçi üçün açıqdır (sahiblik/səviyyə tələb olunmur — sadəcə auth):
@@ -135,11 +140,11 @@ Bütün servislər hər bitmiş HTTP sorğusunu (method, path, status, müddət 
 
 ## CORS
 
-Bütün 11 servis `github.com/go-chi/cors` ilə brauzer-mənşəli sorğulara icazə verir — default olaraq `http://localhost:5173` (Vite dev server) `CORS_ALLOWED_ORIGINS` env dəyişəni ilə tənzimlənir (vergüllə ayrılmış siyahı). `Authorization`, `Content-Type` başlıqlarına və `GET/POST/PUT/DELETE/OPTIONS` metodlarına icazə verilir.
+Bütün 12 servis `github.com/go-chi/cors` ilə brauzer-mənşəli sorğulara icazə verir — default olaraq `http://localhost:5173` (Vite dev server) `CORS_ALLOWED_ORIGINS` env dəyişəni ilə tənzimlənir (vergüllə ayrılmış siyahı). `Authorization`, `Content-Type` başlıqlarına və `GET/POST/PUT/DELETE/OPTIONS` metodlarına icazə verilir.
 
 ## Cavab formatı (uğur/xəta)
 
-Bütün 11 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarır:
+Bütün 12 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarır:
 
 ```json
 // uğurlu:
@@ -156,7 +161,7 @@ Bütün 11 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytar�
 Hər servisin öz `.env`-i var (bax hər qovluqdakı `.env.example`). Sırası fərq etmir, amma tam funksionallıq üçün hamısı ayaqda olmalıdır. Tam addım-addım təlimat və nümunə API çağırışları üçün bax [README.md](README.md).
 
 ```bash
-# 11 ayrı terminalda:
+# 12 ayrı terminalda:
 cd notification-service   && go run ./cmd/api   # :8083
 cd authorization-service  && go run ./cmd/api   # :8084
 cd registration-service   && go run ./cmd/api   # :8081
@@ -168,6 +173,7 @@ cd shop-chat-service      && go run ./cmd/api   # :8088
 cd shop-order-service     && go run ./cmd/api   # :8089
 cd localization-service   && go run ./cmd/api   # :8090
 cd log-service            && go run ./cmd/api   # :8091
+cd shop-category-service  && go run ./cmd/api   # :8092
 ```
 
 Hər servisin öz Swagger UI-ı var: `http://localhost:<port>/swagger/index.html`

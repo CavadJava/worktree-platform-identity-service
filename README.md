@@ -1,6 +1,6 @@
 # go-project-practices
 
-11 ayrı Go mikroservisi: qeydiyyat/login, profil, bildiriş, autorizasiya, mağaza rolları, mağaza CRUD + müraciət axını + abunəlik, məhsul CRUD + favoritlər, istifadəçi↔mağaza yazışması, sifarişlər, çoxdilli mətnlər, mərkəzi loglama. Arxitektura və servislərin bir-biri ilə əlaqəsi üçün bax [ARCHITECTURE.md](ARCHITECTURE.md).
+12 ayrı Go mikroservisi: qeydiyyat/login, profil, bildiriş, autorizasiya, mağaza rolları, mağaza CRUD + müraciət axını + abunəlik, məhsul CRUD + favoritlər, istifadəçi↔mağaza yazışması, sifarişlər, çoxdilli mətnlər, mərkəzi loglama, kataloq (kateqoriyalar). Arxitektura və servislərin bir-biri ilə əlaqəsi üçün bax [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Tələblər
 
@@ -10,7 +10,7 @@
 
 ## Servisləri işə salmaq
 
-Hər servisin öz `.env`-i var (repo-da hazır, lokal inkişaf üçün). 11 ayrı terminalda:
+Hər servisin öz `.env`-i var (repo-da hazır, lokal inkişaf üçün). 12 ayrı terminalda:
 
 ```bash
 cd notification-service   && go run ./cmd/api   # :8083
@@ -24,12 +24,13 @@ cd shop-chat-service      && go run ./cmd/api   # :8088
 cd shop-order-service     && go run ./cmd/api   # :8089
 cd localization-service   && go run ./cmd/api   # :8090
 cd log-service            && go run ./cmd/api   # :8091
+cd shop-category-service  && go run ./cmd/api   # :8092
 ```
 
 Sıra fərq etmir, amma tam axın üçün hamısı ayaqda olmalıdır. Yoxlamaq:
 
 ```bash
-for p in 8081 8082 8083 8084 8085 8086 8087 8088 8089 8090 8091; do curl -s http://localhost:$p/health; echo " :$p"; done
+for p in 8081 8082 8083 8084 8085 8086 8087 8088 8089 8090 8091 8092; do curl -s http://localhost:$p/health; echo " :$p"; done
 ```
 
 Hər servisin Swagger UI-ı: `http://localhost:<port>/swagger/index.html`
@@ -391,3 +392,4 @@ curl "http://localhost:8090/api/v1/locales"
 | Sifarişlər | [shop-order-service](shop-order-service) | 8089 | [README](shop-order-service/README.md) |
 | Çoxdilli mətnlər | [localization-service](localization-service) | 8090 | [README](localization-service/README.md) |
 | Mərkəzi loglama | [log-service](log-service) | 8091 | [README](log-service/README.md) |
+| Kataloq (kateqoriyalar) | [shop-category-service](shop-category-service) | 8092 | [README](shop-category-service/README.md) |

@@ -1,0 +1,385 @@
+basePath: /api/v1
+definitions:
+  handlers.categoryRequest:
+    properties:
+      icon:
+        type: string
+      id:
+        description: boş isə addan slug yaradılır
+        type: string
+      name:
+        type: string
+      sort_order:
+        type: integer
+    type: object
+  handlers.subcategoryRequest:
+    properties:
+      id:
+        type: string
+      image:
+        type: string
+      name:
+        type: string
+      sort_order:
+        type: integer
+    type: object
+  models.Category:
+    properties:
+      created_at:
+        type: string
+      icon:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      sort_order:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  models.Subcategory:
+    properties:
+      category_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      image:
+        type: string
+      name:
+        type: string
+      sort_order:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: 'Sistem-səviyyəli kataloq: kateqoriyalar və alt-kateqoriyalar. Oxumaq
+    public-dir; yaratma/yeniləmə/silmə yalnız administrator üçündür. İlk açılışda
+    default kataloq idempotent seed edilir.'
+  title: Shop Category Service API
+  version: "1.0"
+paths:
+  /categories:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Category'
+            type: array
+      summary: List all categories
+      tags:
+      - categories
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Category payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.categoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Category'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a category (administrator only)
+      tags:
+      - categories
+  /categories/{id}:
+    delete:
+      parameters:
+      - description: Category ID (slug)
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a category and its subcategories (administrator only)
+      tags:
+      - categories
+    get:
+      parameters:
+      - description: Category ID (slug)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Category'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get a category
+      tags:
+      - categories
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Category ID (slug)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Category payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.categoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Category'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update a category (administrator only)
+      tags:
+      - categories
+  /categories/{id}/subcategories:
+    get:
+      parameters:
+      - description: Category ID (slug)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Subcategory'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List a category's subcategories
+      tags:
+      - categories
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Category ID (slug)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Subcategory payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.subcategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Subcategory'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Add a subcategory to a category (administrator only)
+      tags:
+      - categories
+  /subcategories:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Subcategory'
+            type: array
+      summary: List all subcategories across categories
+      tags:
+      - categories
+  /subcategories/{id}:
+    delete:
+      parameters:
+      - description: Subcategory ID (slug)
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a subcategory (administrator only)
+      tags:
+      - categories
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subcategory ID (slug)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Subcategory payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.subcategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Subcategory'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update a subcategory (administrator only)
+      tags:
+      - categories
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
