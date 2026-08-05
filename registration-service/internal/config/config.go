@@ -19,8 +19,9 @@ type Config struct {
 	JWTSecret     string
 	JWTTTLMinutes int
 
-	Port                string
-	NotificationBaseURL string
+	Port                 string
+	NotificationBaseURL  string
+	AuthorizationBaseURL string
 }
 
 func Load() (*Config, error) {
@@ -42,6 +43,7 @@ func Load() (*Config, error) {
 		JWTTTLMinutes:       ttl,
 		Port:                getEnv("PORT", "8081"),
 		NotificationBaseURL: getEnv("NOTIFICATION_SERVICE_URL", "http://localhost:8083"),
+		AuthorizationBaseURL: getEnv("AUTHORIZATION_SERVICE_URL", "http://localhost:8084"),
 	}
 
 	if cfg.JWTSecret == "" {
