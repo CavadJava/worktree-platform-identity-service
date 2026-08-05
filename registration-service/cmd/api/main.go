@@ -14,6 +14,7 @@ import (
 	"registration-service/internal/database"
 	_ "registration-service/internal/docs"
 	"registration-service/internal/handlers"
+	appmiddleware "registration-service/internal/middleware"
 	"registration-service/internal/repository"
 	"registration-service/internal/service"
 )
@@ -41,9 +42,11 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	jwtManager := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTTTLMinutes)
 	notificationClient := client.NewNotificationClient(cfg.NotificationBaseURL)
+	authClient := client.NewAuthorizationClient(cfg.AuthorizationBaseURL)
 	userService := service.NewUserService(userRepo, jwtManager, notificationClient)
 
 	authHandler := handlers.NewAuthHandler(userService)
+	adminHandler := handlers.NewAdminHandler(userService)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -58,6 +61,12 @@ func main() {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/register", authHandler.Register)
 		r.Post("/login", authHandler.Login)
+
+		r.Group(func(r chi.Router) {
+			r.Use(appmiddleware.RequireAdministrator(authClient))
+			r.Get("/users", adminHandler.ListUsers)
+			r.Get("/users/{id}", adminHandler.GetUser)
+		})
 	})
 
 	log.Printf("registration-service listening on :%s", cfg.Port)

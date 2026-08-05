@@ -37,6 +37,12 @@ definitions:
         type: string
       phone:
         type: string
+      role:
+        type: string
+      shop_id:
+        type: string
+      shop_role_level:
+        type: integer
       updated_at:
         type: string
     type: object
@@ -115,4 +121,63 @@ paths:
       summary: Register a new user
       tags:
       - auth
+  /users:
+    get:
+      parameters:
+      - description: Filter by email (partial match)
+        in: query
+        name: email
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/registration-service_internal_models.User'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List users (administrator only)
+      tags:
+      - admin
+  /users/{id}:
+    get:
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/registration-service_internal_models.User'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get a user by ID (administrator only)
+      tags:
+      - admin
 swagger: "2.0"

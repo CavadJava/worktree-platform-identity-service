@@ -58,3 +58,50 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*models
 	}
 	return u, nil
 }
+
+func (r *UserRepository) FindByID(ctx context.Context, id string) (*models.User, error) {
+	const q = `
+		SELECT id, email, password_hash, full_name, COALESCE(phone, ''), role, shop_id, shop_role_level, created_at, updated_at
+		FROM users WHERE id = $1
+	`
+	u := &models.User{}
+	err := r.db.QueryRowContext(ctx, q, id).Scan(
+		&u.ID, &u.Email, &u.PasswordHash, &u.FullName, &u.Phone, &u.Role, &u.ShopID, &u.ShopRoleLevel, &u.CreatedAt, &u.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+func (r *UserRepository) List(ctx context.Context, emailFilter string) ([]*models.User, error) {
+	q := `
+		SELECT id, email, password_hash, full_name, COALESCE(phone, ''), role, shop_id, shop_role_level, created_at, updated_at
+		FROM users
+	`
+	args := []interface{}{}
+	if emailFilter != "" {
+		q += ` WHERE email ILIKE $1`
+		args = append(args, "%"+emailFilter+"%")
+	}
+	q += ` ORDER BY created_at DESC`
+
+	rows, err := r.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := []*models.User{}
+	for rows.Next() {
+		u := &models.User{}
+		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.FullName, &u.Phone, &u.Role, &u.ShopID, &u.ShopRoleLevel, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}

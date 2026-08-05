@@ -103,6 +103,14 @@ func (s *UserService) Login(ctx context.Context, email, password string) (*Login
 	return &LoginResult{Token: token, ExpiresAt: expiresAt, User: u}, nil
 }
 
+func (s *UserService) GetUser(ctx context.Context, id string) (*models.User, error) {
+	return s.repo.FindByID(ctx, id)
+}
+
+func (s *UserService) ListUsers(ctx context.Context, emailFilter string) ([]*models.User, error) {
+	return s.repo.List(ctx, emailFilter)
+}
+
 func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
