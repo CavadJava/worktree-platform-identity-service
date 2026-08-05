@@ -295,15 +295,19 @@ Kənar şəxs (nə söhbətin müştərisi, nə mağazanın chat(1)+ əməkdaş�
 Hər istifadəçinin (`user_seq`) və mağazanın (`shop_seq`) qeydiyyat/yaranma anında avtomatik ardıcıl nömrəsi var — `GET /users`, `GET /shops/{id}` cavablarında görünür. Sifariş nömrəsi bunlardan qurulur: `"U<user_seq>-S<shop_seq>-<n>"`.
 
 ```bash
-# Mağaza sahibi məhsullar yaradır:
-P1=$(curl -s -X POST http://localhost:8087/api/v1/products -H "Authorization: Bearer $OWNER_TOKEN" -H "Content-Type: application/json" -d '{"shop_id":"'"$SHOP_ID"'","name":"Noutbuk","price":1200,"stock":5}' | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['id'])")
-P2=$(curl -s -X POST http://localhost:8087/api/v1/products -H "Authorization: Bearer $OWNER_TOKEN" -H "Content-Type: application/json" -d '{"shop_id":"'"$SHOP_ID"'","name":"Siçan","price":25,"stock":50}' | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['id'])")
+# Mağaza sahibi "Bayraq" məhsulunu və onun variantlarını (item) yaradır:
+PRODUCT_ID=$(curl -s -X POST http://localhost:8087/api/v1/products -H "Authorization: Bearer $OWNER_TOKEN" -H "Content-Type: application/json" -d '{"shop_id":"'"$SHOP_ID"'","name":"Bayraq"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['id'])")
+ITEM1=$(curl -s -X POST "http://localhost:8087/api/v1/products/$PRODUCT_ID/items" -H "Authorization: Bearer $OWNER_TOKEN" -H "Content-Type: application/json" -d '{"name":"30x60 1 qat","price":15,"stock":200,"is_discounted":false}' | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['id'])")
+ITEM2=$(curl -s -X POST "http://localhost:8087/api/v1/products/$PRODUCT_ID/items" -H "Authorization: Bearer $OWNER_TOKEN" -H "Content-Type: application/json" -d '{"name":"100x100 2 qat","price":45,"stock":50,"is_discounted":true,"discount_price":35}' | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['id'])")
 
-# Customer bir mağazadan bir neçə məhsul seçib sifariş yaradır:
+# Customer bir mağazadan bir neçə VARİANT seçib sifariş yaradır (product_id yox, product_item_id):
 curl -X POST http://localhost:8089/api/v1/orders -H "Authorization: Bearer $CUSTOMER_TOKEN" -H "Content-Type: application/json" \
-  -d '{"shop_id":"'"$SHOP_ID"'","items":[{"product_id":"'"$P1"'","quantity":1},{"product_id":"'"$P2"'","quantity":2}]}'
-# → {"success":true,"data":{"order_number":"U27-S6-1","total_amount":1250,"items":[...],"status":"pending",...}}
-# Hər sətirdə "product_name"/"unit_price" sifariş anındakı "şəkildir" — mağaza sonra qiyməti dəyişsə belə bu sifariş dəyişmir.
+  -d '{"shop_id":"'"$SHOP_ID"'","items":[{"product_item_id":"'"$ITEM1"'","quantity":3},{"product_item_id":"'"$ITEM2"'","quantity":2}]}'
+# → {"success":true,"data":{"order_number":"U27-S6-1","total_amount":115,"items":[
+#     {"product_name":"Bayraq","item_name":"30x60 1 qat","unit_price":15,"quantity":3},
+#     {"product_name":"Bayraq","item_name":"100x100 2 qat","unit_price":35,"quantity":2}  ← discount_price avtomatik tətbiq olundu (45 yox, 35)
+#   ],"status":"pending",...}}
+# Hər sətirdə "item_name"/"unit_price" sifariş anındakı "şəkildir" — mağaza sonra qiyməti/endirimi dəyişsə belə bu sifariş dəyişmir.
 
 # Customer öz sifarişlərinə baxır:
 curl "http://localhost:8089/api/v1/orders" -H "Authorization: Bearer $CUSTOMER_TOKEN"

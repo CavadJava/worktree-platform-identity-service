@@ -22,8 +22,8 @@ func NewOrderHandler(svc *service.OrderService) *OrderHandler {
 }
 
 type orderItemRequest struct {
-	ProductID string `json:"product_id"`
-	Quantity  int    `json:"quantity"`
+	ProductItemID string `json:"product_item_id"`
+	Quantity      int    `json:"quantity"`
 }
 
 type createOrderRequest struct {
@@ -33,7 +33,7 @@ type createOrderRequest struct {
 
 // Create godoc
 // @Summary      Create an order
-// @Description  İstənilən login olmuş istifadəçi bir mağazadan bir və ya bir neçə məhsul seçib sifariş yarada bilər. Qiymət/ad sifariş anında "şəkil" kimi saxlanılır (sonradan dəyişsə belə sifariş dəyişmir).
+// @Description  İstənilən login olmuş istifadəçi bir mağazadan bir və ya bir neçə məhsul VARİANTI (product_item_id, məs. "30x60 1 qat") seçib sifariş yarada bilər. Qiymət (endirimli olsa endirim qiyməti) və ad sifariş anında "şəkil" kimi saxlanılır (sonradan dəyişsə belə sifariş dəyişmir).
 // @Tags         orders
 // @Accept       json
 // @Produce      json
@@ -62,7 +62,7 @@ func (h *OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	items := make([]service.ItemInput, len(req.Items))
 	for i, it := range req.Items {
-		items[i] = service.ItemInput{ProductID: it.ProductID, Quantity: it.Quantity}
+		items[i] = service.ItemInput{ProductItemID: it.ProductItemID, Quantity: it.Quantity}
 	}
 
 	order, err := h.svc.Create(r.Context(), identity.UserID, req.ShopID, items)
@@ -158,8 +158,8 @@ func writeOrderError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, service.ErrOrderNotFound):
 		writeError(w, http.StatusNotFound, "order not found")
-	case errors.Is(err, service.ErrProductNotFound):
-		writeError(w, http.StatusNotFound, "product not found")
+	case errors.Is(err, service.ErrProductItemNotFound):
+		writeError(w, http.StatusNotFound, "product item not found")
 	case errors.Is(err, service.ErrShopNotFound):
 		writeError(w, http.StatusNotFound, "shop not found")
 	case errors.Is(err, service.ErrUserNotFound):

@@ -16,9 +16,9 @@ import (
 var (
 	ErrItemsRequired       = errors.New("at least one item is required")
 	ErrInvalidQuantity     = errors.New("quantity must be greater than zero")
-	ErrProductShopMismatch = errors.New("product does not belong to the specified shop")
+	ErrProductShopMismatch = errors.New("product item does not belong to the specified shop")
 	ErrOrderNotFound       = repository.ErrOrderNotFound
-	ErrProductNotFound     = repository.ErrProductNotFound
+	ErrProductItemNotFound = repository.ErrProductItemNotFound
 	ErrShopNotFound        = repository.ErrShopNotFound
 	ErrUserNotFound        = repository.ErrUserNotFound
 	ErrForbidden           = errors.New("forbidden")
@@ -41,8 +41,8 @@ func (i Identity) isShopStaffOf(shopID string) bool {
 }
 
 type ItemInput struct {
-	ProductID string
-	Quantity  int
+	ProductItemID string
+	Quantity      int
 }
 
 type OrderService struct {
@@ -54,10 +54,12 @@ func NewOrderService(orders *repository.OrderRepository, lookup *repository.Look
 	return &OrderService{orders: orders, lookup: lookup}
 }
 
-// Create validates every line item belongs to shopID, snapshots each
-// product's current name/price (so later price changes don't rewrite past
-// orders), and stamps an order_number of the form "U<user_seq>-S<shop_seq>-<n>"
-// where <n> is this user's order count across all shops, plus one.
+// Create validates every line item's product_item belongs to shopID,
+// snapshots each item's current display name/price — resolving the
+// discounted price server-side when the item is on sale, so later price or
+// discount changes never rewrite past orders — and stamps an order_number
+// of the form "U<user_seq>-S<shop_seq>-<n>" where <n> is this user's order
+// count across all shops, plus one.
 func (s *OrderService) Create(ctx context.Context, userID, shopID string, items []ItemInput) (*models.Order, error) {
 	if len(items) == 0 {
 		return nil, ErrItemsRequired
@@ -82,22 +84,24 @@ func (s *OrderService) Create(ctx context.Context, userID, shopID string, items 
 	orderItems := make([]models.OrderItem, 0, len(items))
 	var total float64
 	for _, it := range items {
-		product, err := s.lookup.GetProduct(ctx, it.ProductID)
+		productItem, err := s.lookup.GetProductItem(ctx, it.ProductItemID)
 		if err != nil {
 			return nil, err
 		}
-		if product.ShopID != shopID {
+		if productItem.ShopID != shopID {
 			return nil, ErrProductShopMismatch
 		}
-		total += product.Price * float64(it.Quantity)
+		total += productItem.Price * float64(it.Quantity)
 		orderItems = append(orderItems, models.OrderItem{
-			ID:          uuid.NewString(),
-			OrderID:     orderID,
-			ProductID:   product.ID,
-			ProductName: product.Name,
-			UnitPrice:   product.Price,
-			Quantity:    it.Quantity,
-			CreatedAt:   now,
+			ID:            uuid.NewString(),
+			OrderID:       orderID,
+			ProductID:     productItem.ProductID,
+			ProductItemID: productItem.ID,
+			ProductName:   productItem.ProductName,
+			ItemName:      productItem.ItemName,
+			UnitPrice:     productItem.Price,
+			Quantity:      it.Quantity,
+			CreatedAt:     now,
 		})
 	}
 

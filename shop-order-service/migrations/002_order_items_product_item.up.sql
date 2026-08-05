@@ -1,0 +1,2 @@
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS product_item_id UUID;
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS item_name VARCHAR(255);

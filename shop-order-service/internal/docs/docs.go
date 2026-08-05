@@ -47,7 +47,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "İstənilən login olmuş istifadəçi bir mağazadan bir və ya bir neçə məhsul seçib sifariş yarada bilər. Qiymət/ad sifariş anında \"şəkil\" kimi saxlanılır (sonradan dəyişsə belə sifariş dəyişmir).",
+                "description": "İstənilən login olmuş istifadəçi bir mağazadan bir və ya bir neçə məhsul VARİANTI (product_item_id, məs. \"30x60 1 qat\") seçib sifariş yarada bilər. Qiymət (endirimli olsa endirim qiyməti) və ad sifariş anında \"şəkil\" kimi saxlanılır (sonradan dəyişsə belə sifariş dəyişmir).",
                 "consumes": [
                     "application/json"
                 ],
@@ -214,7 +214,7 @@ const docTemplate = `{
         "internal_handlers.orderItemRequest": {
             "type": "object",
             "properties": {
-                "product_id": {
+                "product_item_id": {
                     "type": "string"
                 },
                 "quantity": {
@@ -266,10 +266,16 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "item_name": {
+                    "type": "string"
+                },
                 "order_id": {
                     "type": "string"
                 },
                 "product_id": {
+                    "type": "string"
+                },
+                "product_item_id": {
                     "type": "string"
                 },
                 "product_name": {

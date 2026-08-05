@@ -39,11 +39,13 @@ func (r *OrderRepository) Create(ctx context.Context, order *models.Order) error
 	}
 
 	const itemQ = `
-		INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO order_items (id, order_id, product_id, product_item_id, product_name, item_name, unit_price, quantity, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 	for _, item := range order.Items {
-		if _, err := tx.ExecContext(ctx, itemQ, item.ID, order.ID, item.ProductID, item.ProductName, item.UnitPrice, item.Quantity, item.CreatedAt); err != nil {
+		if _, err := tx.ExecContext(ctx, itemQ,
+			item.ID, order.ID, item.ProductID, item.ProductItemID, item.ProductName, item.ItemName, item.UnitPrice, item.Quantity, item.CreatedAt,
+		); err != nil {
 			return err
 		}
 	}
@@ -122,7 +124,7 @@ func (r *OrderRepository) list(ctx context.Context, q, arg string) ([]*models.Or
 
 func (r *OrderRepository) itemsFor(ctx context.Context, orderID string) ([]models.OrderItem, error) {
 	const q = `
-		SELECT id, order_id, product_id, product_name, unit_price, quantity, created_at
+		SELECT id, order_id, product_id, COALESCE(product_item_id::text, ''), product_name, COALESCE(item_name, ''), unit_price, quantity, created_at
 		FROM order_items WHERE order_id = $1
 		ORDER BY created_at ASC
 	`
@@ -135,7 +137,9 @@ func (r *OrderRepository) itemsFor(ctx context.Context, orderID string) ([]model
 	items := []models.OrderItem{}
 	for rows.Next() {
 		var item models.OrderItem
-		if err := rows.Scan(&item.ID, &item.OrderID, &item.ProductID, &item.ProductName, &item.UnitPrice, &item.Quantity, &item.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&item.ID, &item.OrderID, &item.ProductID, &item.ProductItemID, &item.ProductName, &item.ItemName, &item.UnitPrice, &item.Quantity, &item.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
