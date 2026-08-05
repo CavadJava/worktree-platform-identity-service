@@ -31,6 +31,10 @@ Hər dəyişiklikdə (`send-form`/`approve`/`reject`) [notification-service](../
 
 İstənilən login olmuş istifadəçi bir mağazaya abunə ola bilər (sahiblik/səviyyə tələb olunmur) — `shop_subscriptions (user_id, shop_id)`, idempotent (`ON CONFLICT DO NOTHING`).
 
+## `shop_seq`
+
+Hər mağaza yaranma anında avtomatik, ardıcıl `shop_seq` (`BIGSERIAL`) alır — API cavablarında görünür. [shop-order-service](../shop-order-service) sifariş nömrəsi (`order_number`) qurmaq üçün bunu birbaşa DB-dən oxuyur.
+
 ## Stack
 - Go 1.26 + chi router
 - PostgreSQL (`pgx`) — `shops`, `shop_applications`, `shop_subscriptions` cədvəllərinin sahibi + `users.shop_id`/`shop_role_level`-ə yazır (send-form/approve/reject zamanı)

@@ -1,6 +1,6 @@
 # Arxitektura
 
-8 ayrı Go mikroservisi, ortaq bir PostgreSQL instansiyasına (`localhost:5433`) qoşulur.
+9 ayrı Go mikroservisi, ortaq bir PostgreSQL instansiyasına (`localhost:5433`) qoşulur.
 
 ```
  registration-service :8081 ──POST /notifications──▶ notification-service :8083
@@ -52,6 +52,7 @@
 | shop-service               | 8086 | mağaza CRUD + müraciət/təsdiq axını + abunəlik        | var, `shops`/`shop_applications`/`shop_subscriptions` sxemlərinin sahibi | authorization-service, notification-service |
 | shop-product-service       | 8087 | məhsul CRUD + favoritlər                               | var, `products`/`product_favorites` sxemlərinin sahibi | authorization-service |
 | shop-chat-service           | 8088 | istifadəçi ↔ mağaza yazışması                          | var, `conversations`/`messages` sxemlərinin sahibi | authorization-service |
+| shop-order-service           | 8089 | sifariş yaratma/siyahı                                 | var, `orders`/`order_items` sxemlərinin sahibi + `users`/`shops`/`products`-ı oxuyur | authorization-service |
 
 ## Niyə belə bölündü
 
@@ -104,11 +105,19 @@ Bunlar istənilən login olmuş istifadəçi üçün açıqdır (sahiblik/səviy
 
 - **Məhsul favoritləri** ([shop-product-service](shop-product-service)): `POST/DELETE /products/{id}/favorite`, `GET /favorites` — istifadəçinin özü üçün. `product_favorites (user_id, product_id)` composite PK, `ON CONFLICT DO NOTHING` ilə idempotent.
 - **Mağaza abunəliyi** ([shop-service](shop-service)): `POST/DELETE /shops/{id}/subscribe`, `GET /subscriptions`. `shop_subscriptions (user_id, shop_id)` eyni pattern.
-- **İstifadəçi ↔ mağaza yazışması** ([shop-chat-service](shop-chat-service), yeni servis, :8088): hər `(shop_id, user_id)` cütü üçün **bir** söhbət mövcuddur (`UNIQUE (shop_id, user_id)`) — `POST /conversations {shop_id}` mövcud olanı tapıb qaytarır, yoxdursa yaradır. Mesaj göndərən tərəf avtomatik müəyyən olunur: `caller.UserID == conversation.UserID` olsa `sender_role=user`, əks halda `sender_role=shop`. Kim yaza/oxuya bilər: söhbətin sahibi olan müştəri, mağazanın **chat(1)+** səviyyəli əməkdaşı, və ya sistem administratoru — bu, `chat` (1) səviyyəsinin ilk konkret istifadəsidir (əvvəllər yalnız hierarxiyada nəzərdə tutulmuşdu, funksional qarşılığı yox idi).
+- **İstifadəçi ↔ mağaza yazışması** ([shop-chat-service](shop-chat-service), :8088): hər `(shop_id, user_id)` cütü üçün **bir** söhbət mövcuddur (`UNIQUE (shop_id, user_id)`) — `POST /conversations {shop_id}` mövcud olanı tapıb qaytarır, yoxdursa yaradır. Mesaj göndərən tərəf avtomatik müəyyən olunur: `caller.UserID == conversation.UserID` olsa `sender_role=user`, əks halda `sender_role=shop`. Kim yaza/oxuya bilər: söhbətin sahibi olan müştəri, mağazanın **chat(1)+** səviyyəli əməkdaşı, və ya sistem administratoru — bu, `chat` (1) səviyyəsinin ilk konkret istifadəsidir (əvvəllər yalnız hierarxiyada nəzərdə tutulmuşdu, funksional qarşılığı yox idi).
+
+## Unikal nömrələr və sifarişlər ([shop-order-service](shop-order-service), :8089)
+
+- **`users.user_seq`** (registration-service) və **`shops.shop_seq`** (shop-service) — hər ikisi `BIGSERIAL UNIQUE`, qeydiyyat/mağaza yaranma anında avtomatik, ardıcıl təyin olunur (1, 2, 3...). API cavablarında görünür (`GET /users`, `GET /shops/{id}` və s.).
+- **Sifariş yaratma**: istifadəçi `POST /orders {shop_id, items:[{product_id, quantity}]}` ilə bir mağazadan bir və ya bir neçə məhsul sifariş edir. Bütün `items` eyni `shop_id`-yə aid olmalıdır (qarışıq-mağaza sifarişi yoxdur) — əks halda `400 bad_request`. Hər sətir üçün məhsulun cari **adı və qiyməti sifariş anında "şəkil" kimi saxlanılır** (`order_items.product_name`/`unit_price`) ki, mağaza sonradan qiyməti dəyişsə belə köhnə sifariş dəyişməsin.
+- **`order_number` formatı**: `"U<user_seq>-S<shop_seq>-<n>"`, məsələn `"U27-S6-2"` — istifadəçi #27-nin mağaza #6-dan 2-ci sifarişi. `<n>` = bu istifadəçinin (bütün mağazalar üzrə) əvvəlki sifarişlərinin sayı + 1, sifariş yaradılan tranzaksiyadan əvvəl hesablanır.
+- **Kim baxa bilər**: `GET /orders` — öz sifarişlərim (`user_id` ilə filtrlənib). `GET /orders/{id}` — sifarişi verən istifadəçi, mağazanın **add-product(2)+** səviyyəli əməkdaşı, ya da administrator. `GET /shops/{shop_id}/orders` — mağaza tərəfi, eyni səviyyə tələbi (sifarişlərə baxmaq add-product(2) səviyyəsinin — "mağazanın satış/kataloq idarəçiliyi" mənasının — təbii davamı sayılıb, sırf mesajlaşma olan `chat(1)`-dən fərqli olaraq).
+- shop-order-service `orders`/`order_items` cədvəllərinin sxem sahibidir, amma `users.user_seq`, `shops.shop_seq`, `products` (ad/qiymət/shop_id) üçün **birbaşa, read-only** eyni Postgres instansiyasından oxuyur — digər servislərin (məs. shop-role-service-in `users`-ı oxuması) artıq qurulmuş "ortaq DB, konkret sütun/cədvəl üçün nəzarətli cross-read" konvensiyasını izləyir, əlavə HTTP round-trip-lər olmadan.
 
 ## Cavab formatı (uğur/xəta)
 
-Bütün 8 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarır:
+Bütün 9 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarır:
 
 ```json
 // uğurlu:
@@ -125,7 +134,7 @@ Bütün 8 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarı
 Hər servisin öz `.env`-i var (bax hər qovluqdakı `.env.example`). Sırası fərq etmir, amma tam funksionallıq üçün hamısı ayaqda olmalıdır. Tam addım-addım təlimat və nümunə API çağırışları üçün bax [README.md](README.md).
 
 ```bash
-# 8 ayrı terminalda:
+# 9 ayrı terminalda:
 cd notification-service   && go run ./cmd/api   # :8083
 cd authorization-service  && go run ./cmd/api   # :8084
 cd registration-service   && go run ./cmd/api   # :8081
@@ -134,6 +143,7 @@ cd shop-role-service      && go run ./cmd/api   # :8085
 cd shop-service           && go run ./cmd/api   # :8086
 cd shop-product-service   && go run ./cmd/api   # :8087
 cd shop-chat-service      && go run ./cmd/api   # :8088
+cd shop-order-service     && go run ./cmd/api   # :8089
 ```
 
 Hər servisin öz Swagger UI-ı var: `http://localhost:<port>/swagger/index.html`

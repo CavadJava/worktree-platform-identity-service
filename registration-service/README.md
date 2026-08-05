@@ -39,6 +39,10 @@ Hər qeydiyyat `role="user"`, `shop_id=null`, `shop_role_level=0` alır (bax `in
 
 Rol/səviyyə dəyişikliyi bu servisdən edilə bilməz (özünü admin edən endpoint yoxdur) — [shop-role-service](../shop-role-service) və DB-dən birbaşa müdaxilə lazımdır. Rollar JWT-yə login anında yazılır, ona görə dəyişsə istifadəçi yenidən login olmalıdır.
 
+## `user_seq`
+
+Hər istifadəçi qeydiyyat anında avtomatik, ardıcıl `user_seq` (`BIGSERIAL`) alır — API cavablarında görünür. [shop-order-service](../shop-order-service) sifariş nömrəsi (`order_number`) qurmaq üçün bunu birbaşa DB-dən oxuyur.
+
 ## Structure
 
 ```

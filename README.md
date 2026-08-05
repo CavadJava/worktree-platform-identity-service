@@ -1,6 +1,6 @@
 # go-project-practices
 
-8 ayrı Go mikroservisi: qeydiyyat/login, profil, bildiriş, autorizasiya, mağaza rolları, mağaza CRUD + müraciət axını + abunəlik, məhsul CRUD + favoritlər, istifadəçi↔mağaza yazışması. Arxitektura və servislərin bir-biri ilə əlaqəsi üçün bax [ARCHITECTURE.md](ARCHITECTURE.md).
+9 ayrı Go mikroservisi: qeydiyyat/login, profil, bildiriş, autorizasiya, mağaza rolları, mağaza CRUD + müraciət axını + abunəlik, məhsul CRUD + favoritlər, istifadəçi↔mağaza yazışması, sifarişlər. Arxitektura və servislərin bir-biri ilə əlaqəsi üçün bax [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Tələblər
 
@@ -10,7 +10,7 @@
 
 ## Servisləri işə salmaq
 
-Hər servisin öz `.env`-i var (repo-da hazır, lokal inkişaf üçün). 8 ayrı terminalda:
+Hər servisin öz `.env`-i var (repo-da hazır, lokal inkişaf üçün). 9 ayrı terminalda:
 
 ```bash
 cd notification-service   && go run ./cmd/api   # :8083
@@ -21,12 +21,13 @@ cd shop-role-service      && go run ./cmd/api   # :8085
 cd shop-service           && go run ./cmd/api   # :8086
 cd shop-product-service   && go run ./cmd/api   # :8087
 cd shop-chat-service      && go run ./cmd/api   # :8088
+cd shop-order-service     && go run ./cmd/api   # :8089
 ```
 
 Sıra fərq etmir, amma tam axın üçün hamısı ayaqda olmalıdır. Yoxlamaq:
 
 ```bash
-for p in 8081 8082 8083 8084 8085 8086 8087 8088; do curl -s http://localhost:$p/health; echo " :$p"; done
+for p in 8081 8082 8083 8084 8085 8086 8087 8088 8089; do curl -s http://localhost:$p/health; echo " :$p"; done
 ```
 
 Hər servisin Swagger UI-ı: `http://localhost:<port>/swagger/index.html`
@@ -267,6 +268,32 @@ curl "http://localhost:8088/api/v1/conversations/$CONV_ID/messages" -H "Authoriz
 
 Kənar şəxs (nə söhbətin müştərisi, nə mağazanın chat(1)+ əməkdaşı) `403` alır.
 
+### 16. Sifariş yaratma (unikal nömrələr, `order_number`)
+
+Hər istifadəçinin (`user_seq`) və mağazanın (`shop_seq`) qeydiyyat/yaranma anında avtomatik ardıcıl nömrəsi var — `GET /users`, `GET /shops/{id}` cavablarında görünür. Sifariş nömrəsi bunlardan qurulur: `"U<user_seq>-S<shop_seq>-<n>"`.
+
+```bash
+# Mağaza sahibi məhsullar yaradır:
+P1=$(curl -s -X POST http://localhost:8087/api/v1/products -H "Authorization: Bearer $OWNER_TOKEN" -H "Content-Type: application/json" -d '{"shop_id":"'"$SHOP_ID"'","name":"Noutbuk","price":1200,"stock":5}' | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['id'])")
+P2=$(curl -s -X POST http://localhost:8087/api/v1/products -H "Authorization: Bearer $OWNER_TOKEN" -H "Content-Type: application/json" -d '{"shop_id":"'"$SHOP_ID"'","name":"Siçan","price":25,"stock":50}' | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['id'])")
+
+# Customer bir mağazadan bir neçə məhsul seçib sifariş yaradır:
+curl -X POST http://localhost:8089/api/v1/orders -H "Authorization: Bearer $CUSTOMER_TOKEN" -H "Content-Type: application/json" \
+  -d '{"shop_id":"'"$SHOP_ID"'","items":[{"product_id":"'"$P1"'","quantity":1},{"product_id":"'"$P2"'","quantity":2}]}'
+# → {"success":true,"data":{"order_number":"U27-S6-1","total_amount":1250,"items":[...],"status":"pending",...}}
+# Hər sətirdə "product_name"/"unit_price" sifariş anındakı "şəkildir" — mağaza sonra qiyməti dəyişsə belə bu sifariş dəyişmir.
+
+# Customer öz sifarişlərinə baxır:
+curl "http://localhost:8089/api/v1/orders" -H "Authorization: Bearer $CUSTOMER_TOKEN"
+
+# Mağazanın add-product(2)+ əməkdaşı (və ya sahibi) öz mağazasının gələn sifarişlərinə baxır:
+curl "http://localhost:8089/api/v1/shops/$SHOP_ID/orders" -H "Authorization: Bearer $OWNER_TOKEN"
+
+# Kənar şəxs bu sifarişə baxa bilmir:
+curl -w "\nHTTP:%{http_code}\n" "http://localhost:8089/api/v1/orders/$ORDER_ID" -H "Authorization: Bearer $STRANGER_TOKEN"
+# → 403
+```
+
 ## Servislərin siyahısı
 
 | Servis | Qovluq | Port | README |
@@ -279,3 +306,4 @@ Kənar şəxs (nə söhbətin müştərisi, nə mağazanın chat(1)+ əməkdaş�
 | Mağaza CRUD + müraciət | [shop-service](shop-service) | 8086 | [README](shop-service/README.md) |
 | Məhsul CRUD + favoritlər | [shop-product-service](shop-product-service) | 8087 | [README](shop-product-service/README.md) |
 | İstifadəçi↔mağaza yazışması | [shop-chat-service](shop-chat-service) | 8088 | [README](shop-chat-service/README.md) |
+| Sifarişlər | [shop-order-service](shop-order-service) | 8089 | [README](shop-order-service/README.md) |

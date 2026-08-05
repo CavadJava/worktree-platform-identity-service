@@ -42,11 +42,13 @@ func Migrate(db *sql.DB) error {
 			name VARCHAR(255) NOT NULL,
 			description TEXT,
 			temporary BOOLEAN NOT NULL DEFAULT false,
+			shop_seq BIGSERIAL UNIQUE,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
 		CREATE INDEX IF NOT EXISTS idx_shops_owner_id ON shops (owner_id);
 		ALTER TABLE shops ADD COLUMN IF NOT EXISTS temporary BOOLEAN NOT NULL DEFAULT false;
+		ALTER TABLE shops ADD COLUMN IF NOT EXISTS shop_seq BIGSERIAL UNIQUE;
 
 		CREATE TABLE IF NOT EXISTS shop_applications (
 			id UUID PRIMARY KEY,

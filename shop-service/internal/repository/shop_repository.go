@@ -22,19 +22,19 @@ func (r *ShopRepository) Create(ctx context.Context, s *models.Shop) error {
 	const q = `
 		INSERT INTO shops (id, owner_id, name, description, temporary, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING shop_seq
 	`
-	_, err := r.db.ExecContext(ctx, q, s.ID, s.OwnerID, s.Name, s.Description, s.Temporary, s.CreatedAt, s.UpdatedAt)
-	return err
+	return r.db.QueryRowContext(ctx, q, s.ID, s.OwnerID, s.Name, s.Description, s.Temporary, s.CreatedAt, s.UpdatedAt).Scan(&s.ShopSeq)
 }
 
 func (r *ShopRepository) FindByID(ctx context.Context, id string) (*models.Shop, error) {
 	const q = `
-		SELECT id, owner_id, name, COALESCE(description, ''), temporary, created_at, updated_at
+		SELECT id, owner_id, name, COALESCE(description, ''), temporary, shop_seq, created_at, updated_at
 		FROM shops WHERE id = $1
 	`
 	s := &models.Shop{}
 	err := r.db.QueryRowContext(ctx, q, id).Scan(
-		&s.ID, &s.OwnerID, &s.Name, &s.Description, &s.Temporary, &s.CreatedAt, &s.UpdatedAt,
+		&s.ID, &s.OwnerID, &s.Name, &s.Description, &s.Temporary, &s.ShopSeq, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrShopNotFound
@@ -49,7 +49,7 @@ func (r *ShopRepository) FindByID(ctx context.Context, id string) (*models.Shop,
 // shops never appear here, since their listings/products aren't vetted yet.
 func (r *ShopRepository) List(ctx context.Context, ownerID string) ([]*models.Shop, error) {
 	q := `
-		SELECT id, owner_id, name, COALESCE(description, ''), temporary, created_at, updated_at
+		SELECT id, owner_id, name, COALESCE(description, ''), temporary, shop_seq, created_at, updated_at
 		FROM shops
 		WHERE temporary = false
 	`
@@ -69,7 +69,7 @@ func (r *ShopRepository) List(ctx context.Context, ownerID string) ([]*models.Sh
 	shops := []*models.Shop{}
 	for rows.Next() {
 		s := &models.Shop{}
-		if err := rows.Scan(&s.ID, &s.OwnerID, &s.Name, &s.Description, &s.Temporary, &s.CreatedAt, &s.UpdatedAt); err != nil {
+		if err := rows.Scan(&s.ID, &s.OwnerID, &s.Name, &s.Description, &s.Temporary, &s.ShopSeq, &s.CreatedAt, &s.UpdatedAt); err != nil {
 			return nil, err
 		}
 		shops = append(shops, s)
@@ -85,7 +85,7 @@ func (r *ShopRepository) Update(ctx context.Context, id, name, description strin
 	`
 	s := &models.Shop{}
 	err := r.db.QueryRowContext(ctx, q, id, name, description).Scan(
-		&s.ID, &s.OwnerID, &s.Name, &s.Description, &s.Temporary, &s.CreatedAt, &s.UpdatedAt,
+		&s.ID, &s.OwnerID, &s.Name, &s.Description, &s.Temporary, &s.ShopSeq, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrShopNotFound

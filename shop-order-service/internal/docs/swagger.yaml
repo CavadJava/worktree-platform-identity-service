@@ -1,0 +1,188 @@
+basePath: /api/v1
+definitions:
+  internal_handlers.createOrderRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/internal_handlers.orderItemRequest'
+        type: array
+      shop_id:
+        type: string
+    type: object
+  internal_handlers.orderItemRequest:
+    properties:
+      product_id:
+        type: string
+      quantity:
+        type: integer
+    type: object
+  shop-order-service_internal_models.Order:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/shop-order-service_internal_models.OrderItem'
+        type: array
+      order_number:
+        type: string
+      shop_id:
+        type: string
+      status:
+        type: string
+      total_amount:
+        type: number
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  shop-order-service_internal_models.OrderItem:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      order_id:
+        type: string
+      product_id:
+        type: string
+      product_name:
+        type: string
+      quantity:
+        type: integer
+      unit_price:
+        type: number
+    type: object
+info:
+  contact: {}
+  description: İstifadəçilərin mağazalardan məhsul seçib sifariş yaratması. Sifariş
+    nömrəsi "U<istifadəçi_seq>-S<mağaza_seq>-<n>" formatındadır (<n> — istifadəçinin
+    neçənci sifarişi olduğu).
+  title: Shop Order Service API
+  version: "1.0"
+paths:
+  /orders:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/shop-order-service_internal_models.Order'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List my orders
+      tags:
+      - orders
+    post:
+      consumes:
+      - application/json
+      description: İstənilən login olmuş istifadəçi bir mağazadan bir və ya bir neçə
+        məhsul seçib sifariş yarada bilər. Qiymət/ad sifariş anında "şəkil" kimi saxlanılır
+        (sonradan dəyişsə belə sifariş dəyişmir).
+      parameters:
+      - description: Order payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.createOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/shop-order-service_internal_models.Order'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create an order
+      tags:
+      - orders
+  /orders/{id}:
+    get:
+      description: Sifarişi verən istifadəçi, mağazanın add-product(2)+ əməkdaşı,
+        ya da administrator baxa bilər.
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/shop-order-service_internal_models.Order'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get an order (with items)
+      tags:
+      - orders
+  /shops/{shop_id}/orders:
+    get:
+      description: Mağazanın add-product(2)+ səviyyəli əməkdaşı, ya da administrator.
+      parameters:
+      - description: Shop ID
+        in: path
+        name: shop_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/shop-order-service_internal_models.Order'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List a shop's incoming orders
+      tags:
+      - orders
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

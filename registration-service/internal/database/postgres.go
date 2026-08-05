@@ -42,6 +42,7 @@ func Migrate(db *sql.DB) error {
 			role VARCHAR(50) NOT NULL DEFAULT 'user',
 			shop_id UUID,
 			shop_role_level INTEGER NOT NULL DEFAULT 0,
+			user_seq BIGSERIAL UNIQUE,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
@@ -49,6 +50,7 @@ func Migrate(db *sql.DB) error {
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user';
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS shop_id UUID;
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS shop_role_level INTEGER NOT NULL DEFAULT 0;
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS user_seq BIGSERIAL UNIQUE;
 		ALTER TABLE users DROP COLUMN IF EXISTS shopping_roles;
 		CREATE INDEX IF NOT EXISTS idx_users_shop_id ON users (shop_id);
 	`)

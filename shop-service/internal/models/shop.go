@@ -8,6 +8,7 @@ type Shop struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
 	Temporary   bool      `json:"temporary"`
+	ShopSeq     int64     `json:"shop_seq"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
