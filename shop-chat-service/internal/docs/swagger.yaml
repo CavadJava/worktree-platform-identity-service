@@ -1,0 +1,211 @@
+basePath: /api/v1
+definitions:
+  internal_handlers.sendMessageRequest:
+    properties:
+      body:
+        type: string
+    type: object
+  internal_handlers.startConversationRequest:
+    properties:
+      shop_id:
+        type: string
+    type: object
+  shop-chat-service_internal_models.Conversation:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      shop_id:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  shop-chat-service_internal_models.Message:
+    properties:
+      body:
+        type: string
+      conversation_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      sender_id:
+        type: string
+      sender_role:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: 'İstifadəçi ilə mağaza arasında yazışma. Hər (mağaza, istifadəçi) cütü
+    üçün bir söhbət mövcuddur. Söhbətdə yaza bilənlər: söhbətin sahibi olan müştəri,
+    mağazanın chat(1)+ səviyyəli əməkdaşı, və ya sistem administratoru.'
+  title: Shop Chat Service API
+  version: "1.0"
+paths:
+  /conversations:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/shop-chat-service_internal_models.Conversation'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List my conversations (as a customer)
+      tags:
+      - chat
+    post:
+      consumes:
+      - application/json
+      description: İstənilən login olmuş istifadəçi çağıra bilər. Eyni shop_id ilə
+        təkrar çağırış mövcud söhbəti qaytarır.
+      parameters:
+      - description: Start conversation payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.startConversationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/shop-chat-service_internal_models.Conversation'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Start (or resume) a conversation with a shop
+      tags:
+      - chat
+  /conversations/{id}/messages:
+    get:
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/shop-chat-service_internal_models.Message'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List a conversation's messages
+      tags:
+      - chat
+    post:
+      consumes:
+      - application/json
+      description: Söhbətin sahibi olan müştəri, ya da mağazanın chat(1)+ əməkdaşı
+        (və ya administrator) yaza bilər.
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Message payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.sendMessageRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/shop-chat-service_internal_models.Message'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Send a message in a conversation
+      tags:
+      - chat
+  /shops/{shop_id}/conversations:
+    get:
+      description: Sistem administratoru istənilən mağazanın, mağazanın öz chat(1)+
+        əməkdaşı isə yalnız öz mağazasının söhbətlərini görə bilər.
+      parameters:
+      - description: Shop ID
+        in: path
+        name: shop_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/shop-chat-service_internal_models.Conversation'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List a shop's conversations
+      tags:
+      - chat
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

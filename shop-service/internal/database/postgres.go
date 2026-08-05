@@ -63,6 +63,14 @@ func Migrate(db *sql.DB) error {
 		);
 		CREATE INDEX IF NOT EXISTS idx_shop_applications_status ON shop_applications (status);
 		CREATE INDEX IF NOT EXISTS idx_shop_applications_applicant ON shop_applications (applicant_id);
+
+		CREATE TABLE IF NOT EXISTS shop_subscriptions (
+			user_id UUID NOT NULL,
+			shop_id UUID NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			PRIMARY KEY (user_id, shop_id)
+		);
+		CREATE INDEX IF NOT EXISTS idx_shop_subscriptions_shop_id ON shop_subscriptions (shop_id);
 	`)
 	if err != nil {
 		return fmt.Errorf("migrate: %w", err)

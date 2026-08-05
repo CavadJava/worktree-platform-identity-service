@@ -41,15 +41,18 @@ func main() {
 	shopRepo := repository.NewShopRepository(db)
 	appRepo := repository.NewShopApplicationRepository(db)
 	userAssignRepo := repository.NewUserAssignmentRepository(db)
+	subscriptionRepo := repository.NewSubscriptionRepository(db)
 
 	authClient := client.NewAuthorizationClient(cfg.AuthorizationBaseURL)
 	notificationClient := client.NewNotificationClient(cfg.NotificationBaseURL)
 
 	shopService := service.NewShopService(shopRepo)
 	appService := service.NewShopApplicationService(appRepo, shopRepo, userAssignRepo, notificationClient)
+	subscriptionService := service.NewSubscriptionService(subscriptionRepo, shopRepo)
 
 	shopHandler := handlers.NewShopHandler(shopService)
 	appHandler := handlers.NewShopApplicationHandler(appService)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -77,6 +80,10 @@ func main() {
 
 			r.Post("/shop-applications", appHandler.Submit)
 			r.Get("/shop-applications/{id}", appHandler.Get)
+
+			r.Post("/shops/{id}/subscribe", subscriptionHandler.Subscribe)
+			r.Delete("/shops/{id}/subscribe", subscriptionHandler.Unsubscribe)
+			r.Get("/subscriptions", subscriptionHandler.List)
 		})
 
 		r.Group(func(r chi.Router) {

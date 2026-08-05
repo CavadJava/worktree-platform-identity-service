@@ -1,6 +1,6 @@
 # go-project-practices
 
-7 ayrı Go mikroservisi: qeydiyyat/login, profil, bildiriş, autorizasiya, mağaza rolları, mağaza CRUD + müraciət axını, məhsul CRUD. Arxitektura və servislərin bir-biri ilə əlaqəsi üçün bax [ARCHITECTURE.md](ARCHITECTURE.md).
+8 ayrı Go mikroservisi: qeydiyyat/login, profil, bildiriş, autorizasiya, mağaza rolları, mağaza CRUD + müraciət axını + abunəlik, məhsul CRUD + favoritlər, istifadəçi↔mağaza yazışması. Arxitektura və servislərin bir-biri ilə əlaqəsi üçün bax [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Tələblər
 
@@ -10,7 +10,7 @@
 
 ## Servisləri işə salmaq
 
-Hər servisin öz `.env`-i var (repo-da hazır, lokal inkişaf üçün). 7 ayrı terminalda:
+Hər servisin öz `.env`-i var (repo-da hazır, lokal inkişaf üçün). 8 ayrı terminalda:
 
 ```bash
 cd notification-service   && go run ./cmd/api   # :8083
@@ -20,12 +20,13 @@ cd user-service           && go run ./cmd/api   # :8082
 cd shop-role-service      && go run ./cmd/api   # :8085
 cd shop-service           && go run ./cmd/api   # :8086
 cd shop-product-service   && go run ./cmd/api   # :8087
+cd shop-chat-service      && go run ./cmd/api   # :8088
 ```
 
 Sıra fərq etmir, amma tam axın üçün hamısı ayaqda olmalıdır. Yoxlamaq:
 
 ```bash
-for p in 8081 8082 8083 8084 8085 8086 8087; do curl -s http://localhost:$p/health; echo " :$p"; done
+for p in 8081 8082 8083 8084 8085 8086 8087 8088; do curl -s http://localhost:$p/health; echo " :$p"; done
 ```
 
 Hər servisin Swagger UI-ı: `http://localhost:<port>/swagger/index.html`
@@ -233,6 +234,39 @@ curl -X PUT "http://localhost:8086/api/v1/shops/$SHOP_ID" \
 # → 200 OK
 ```
 
+### 15. Favoritlər, abunəlik, yazışma (istənilən login istifadəçi)
+
+```bash
+# Məhsulu favoritə əlavə et / sil / siyahıla:
+curl -X POST "http://localhost:8087/api/v1/products/$PRODUCT_ID/favorite" -H "Authorization: Bearer $CUSTOMER_TOKEN"
+curl -X DELETE "http://localhost:8087/api/v1/products/$PRODUCT_ID/favorite" -H "Authorization: Bearer $CUSTOMER_TOKEN"
+curl "http://localhost:8087/api/v1/favorites" -H "Authorization: Bearer $CUSTOMER_TOKEN"
+
+# Mağazaya abunə ol / abunəlikdən çıx / siyahıla:
+curl -X POST "http://localhost:8086/api/v1/shops/$SHOP_ID/subscribe" -H "Authorization: Bearer $CUSTOMER_TOKEN"
+curl -X DELETE "http://localhost:8086/api/v1/shops/$SHOP_ID/subscribe" -H "Authorization: Bearer $CUSTOMER_TOKEN"
+curl "http://localhost:8086/api/v1/subscriptions" -H "Authorization: Bearer $CUSTOMER_TOKEN"
+
+# Mağaza ilə yazışma (eyni müştəri+mağaza cütü üçün bir söhbət):
+CONV_ID=$(curl -s -X POST http://localhost:8088/api/v1/conversations \
+  -H "Authorization: Bearer $CUSTOMER_TOKEN" -H "Content-Type: application/json" \
+  -d '{"shop_id":"'"$SHOP_ID"'"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['id'])")
+
+curl -X POST "http://localhost:8088/api/v1/conversations/$CONV_ID/messages" \
+  -H "Authorization: Bearer $CUSTOMER_TOKEN" -H "Content-Type: application/json" \
+  -d '{"body":"Salam, bu məhsul mövcuddurmu?"}'
+
+# Mağazanın chat(1)+ əməkdaşı (və ya sahibi) öz mağazasının söhbətlərinə baxır və cavab yazır:
+curl "http://localhost:8088/api/v1/shops/$SHOP_ID/conversations" -H "Authorization: Bearer $STAFF_TOKEN"
+curl -X POST "http://localhost:8088/api/v1/conversations/$CONV_ID/messages" \
+  -H "Authorization: Bearer $STAFF_TOKEN" -H "Content-Type: application/json" \
+  -d '{"body":"Bəli, mövcuddur!"}'
+
+curl "http://localhost:8088/api/v1/conversations/$CONV_ID/messages" -H "Authorization: Bearer $CUSTOMER_TOKEN"
+```
+
+Kənar şəxs (nə söhbətin müştərisi, nə mağazanın chat(1)+ əməkdaşı) `403` alır.
+
 ## Servislərin siyahısı
 
 | Servis | Qovluq | Port | README |
@@ -243,4 +277,5 @@ curl -X PUT "http://localhost:8086/api/v1/shops/$SHOP_ID" \
 | Token doğrulama | [authorization-service](authorization-service) | 8084 | [README](authorization-service/README.md) |
 | Mağaza səviyyələri | [shop-role-service](shop-role-service) | 8085 | [README](shop-role-service/README.md) |
 | Mağaza CRUD + müraciət | [shop-service](shop-service) | 8086 | [README](shop-service/README.md) |
-| Məhsul CRUD | [shop-product-service](shop-product-service) | 8087 | [README](shop-product-service/README.md) |
+| Məhsul CRUD + favoritlər | [shop-product-service](shop-product-service) | 8087 | [README](shop-product-service/README.md) |
+| İstifadəçi↔mağaza yazışması | [shop-chat-service](shop-chat-service) | 8088 | [README](shop-chat-service/README.md) |

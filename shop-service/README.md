@@ -27,9 +27,13 @@ Mağaza özü-özünə açılmır — istifadəçi müraciət göndərir, admini
 
 Hər dəyişiklikdə (`send-form`/`approve`/`reject`) [notification-service](../notification-service)-ə mock bildiriş göndərilir (müraciətçinin email-i `users` cədvəlindən oxunur).
 
+## Abunəlik
+
+İstənilən login olmuş istifadəçi bir mağazaya abunə ola bilər (sahiblik/səviyyə tələb olunmur) — `shop_subscriptions (user_id, shop_id)`, idempotent (`ON CONFLICT DO NOTHING`).
+
 ## Stack
 - Go 1.26 + chi router
-- PostgreSQL (`pgx`) — `shops`, `shop_applications` cədvəllərinin sahibi + `users.shop_id`/`shop_role_level`-ə yazır (send-form/approve/reject zamanı)
+- PostgreSQL (`pgx`) — `shops`, `shop_applications`, `shop_subscriptions` cədvəllərinin sahibi + `users.shop_id`/`shop_role_level`-ə yazır (send-form/approve/reject zamanı)
 - notification-service-ə HTTP client (mock bildiriş)
 
 ## Setup
@@ -58,5 +62,8 @@ Default port: **8086**. Swagger UI: http://localhost:8086/swagger/index.html
 | POST   | /api/v1/shop-applications/{id}/send-form  | Bearer (administrator)                  | - |
 | POST   | /api/v1/shop-applications/{id}/approve    | Bearer (administrator)                  | - |
 | POST   | /api/v1/shop-applications/{id}/reject     | Bearer (administrator)                  | `{reason}` (opt.) |
+| POST   | /api/v1/shops/{id}/subscribe              | Bearer (istənilən login istifadəçi)     | - |
+| DELETE | /api/v1/shops/{id}/subscribe              | Bearer (istənilən login istifadəçi)     | - |
+| GET    | /api/v1/subscriptions                     | Bearer (istənilən login istifadəçi)     | - (öz abunəlikləri) |
 
 Bax [../ARCHITECTURE.md](../ARCHITECTURE.md) tam servislərarası axın üçün.

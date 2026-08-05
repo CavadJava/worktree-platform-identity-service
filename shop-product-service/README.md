@@ -10,9 +10,13 @@ Mağaza məhsullarının CRUD idarəetməsi. `products` cədvəlinin sxem sahibi
 
 Hierarxiya: `admin(4) > review(3) > add-product(2) > chat(1)` — yüksək səviyyə aşağı səviyyələrin bütün icazələrini əhatə edir.
 
+## Favoritlər
+
+İstənilən login olmuş istifadəçi bir məhsulu favoritə əlavə edə bilər (sahiblik/səviyyə tələb olunmur) — `product_favorites (user_id, product_id)`, idempotent (`ON CONFLICT DO NOTHING`).
+
 ## Stack
 - Go 1.26 + chi router
-- PostgreSQL (`pgx`) — `products` cədvəlinin sahibi
+- PostgreSQL (`pgx`) — `products`, `product_favorites` cədvəllərinin sahibi
 
 ## Setup
 
@@ -34,5 +38,8 @@ Default port: **8087**. Swagger UI: http://localhost:8087/swagger/index.html
 | GET    | /api/v1/products/{id}| -                                             | - |
 | PUT    | /api/v1/products/{id}| Bearer (add-product(2)+ / administrator)    | `{name, description, price, stock}` |
 | DELETE | /api/v1/products/{id}| Bearer (review(3)+ / administrator)         | - |
+| POST   | /api/v1/products/{id}/favorite | Bearer (istənilən login istifadəçi) | - |
+| DELETE | /api/v1/products/{id}/favorite | Bearer (istənilən login istifadəçi) | - |
+| GET    | /api/v1/favorites     | Bearer (istənilən login istifadəçi)          | - (öz favoritləri) |
 
 Bax [../ARCHITECTURE.md](../ARCHITECTURE.md) tam servislərarası axın üçün.

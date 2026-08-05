@@ -44,6 +44,14 @@ func Migrate(db *sql.DB) error {
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
 		CREATE INDEX IF NOT EXISTS idx_products_shop_id ON products (shop_id);
+
+		CREATE TABLE IF NOT EXISTS product_favorites (
+			user_id UUID NOT NULL,
+			product_id UUID NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			PRIMARY KEY (user_id, product_id)
+		);
+		CREATE INDEX IF NOT EXISTS idx_product_favorites_user_id ON product_favorites (user_id);
 	`)
 	if err != nil {
 		return fmt.Errorf("migrate: %w", err)

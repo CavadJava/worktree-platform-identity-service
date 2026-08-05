@@ -1,6 +1,6 @@
 # Arxitektura
 
-7 ayrı Go mikroservisi, ortaq bir PostgreSQL instansiyasına (`localhost:5433`) qoşulur.
+8 ayrı Go mikroservisi, ortaq bir PostgreSQL instansiyasına (`localhost:5433`) qoşulur.
 
 ```
  registration-service :8081 ──POST /notifications──▶ notification-service :8083
@@ -49,8 +49,9 @@
 | notification-service      | 8083 | bildiriş (mock, log-only)                             | yox                            | - |
 | authorization-service     | 8084 | JWT **doğrulama** (authorization), stateless          | yox                            | - |
 | shop-role-service         | 8085 | mağaza səviyyəsi (1-4) assign/revoke (yalnız admin)   | var, `users.shop_id`/`shop_role_level`-i paylaşır | authorization-service |
-| shop-service               | 8086 | mağaza CRUD + mağaza açma müraciəti/təsdiq axını      | var, `shops` + `shop_applications` sxemlərinin sahibi | authorization-service, notification-service |
-| shop-product-service       | 8087 | məhsul CRUD                                            | var, `products` sxeminin sahibi | authorization-service |
+| shop-service               | 8086 | mağaza CRUD + müraciət/təsdiq axını + abunəlik        | var, `shops`/`shop_applications`/`shop_subscriptions` sxemlərinin sahibi | authorization-service, notification-service |
+| shop-product-service       | 8087 | məhsul CRUD + favoritlər                               | var, `products`/`product_favorites` sxemlərinin sahibi | authorization-service |
+| shop-chat-service           | 8088 | istifadəçi ↔ mağaza yazışması                          | var, `conversations`/`messages` sxemlərinin sahibi | authorization-service |
 
 ## Niyə belə bölündü
 
@@ -97,9 +98,17 @@ Bu, "sistem 4 səviyyəni müəyyən edir, mağaza sahibi isə kimin hansı səv
 
 **İlk administratoru necə təyin etmək olar**: sistemdə özünü admin edən heç bir endpoint yoxdur (təhlükəsizlik üçün qəsdən belədir) — DB-dən birbaşa təyin etmək lazımdır (bax [README.md](README.md)).
 
+## İstifadəçi-tərəfli funksiyalar: favoritlər, abunəlik, yazışma
+
+Bunlar istənilən login olmuş istifadəçi üçün açıqdır (sahiblik/səviyyə tələb olunmur — sadəcə auth):
+
+- **Məhsul favoritləri** ([shop-product-service](shop-product-service)): `POST/DELETE /products/{id}/favorite`, `GET /favorites` — istifadəçinin özü üçün. `product_favorites (user_id, product_id)` composite PK, `ON CONFLICT DO NOTHING` ilə idempotent.
+- **Mağaza abunəliyi** ([shop-service](shop-service)): `POST/DELETE /shops/{id}/subscribe`, `GET /subscriptions`. `shop_subscriptions (user_id, shop_id)` eyni pattern.
+- **İstifadəçi ↔ mağaza yazışması** ([shop-chat-service](shop-chat-service), yeni servis, :8088): hər `(shop_id, user_id)` cütü üçün **bir** söhbət mövcuddur (`UNIQUE (shop_id, user_id)`) — `POST /conversations {shop_id}` mövcud olanı tapıb qaytarır, yoxdursa yaradır. Mesaj göndərən tərəf avtomatik müəyyən olunur: `caller.UserID == conversation.UserID` olsa `sender_role=user`, əks halda `sender_role=shop`. Kim yaza/oxuya bilər: söhbətin sahibi olan müştəri, mağazanın **chat(1)+** səviyyəli əməkdaşı, və ya sistem administratoru — bu, `chat` (1) səviyyəsinin ilk konkret istifadəsidir (əvvəllər yalnız hierarxiyada nəzərdə tutulmuşdu, funksional qarşılığı yox idi).
+
 ## Cavab formatı (uğur/xəta)
 
-Bütün 7 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarır:
+Bütün 8 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarır:
 
 ```json
 // uğurlu:
@@ -116,7 +125,7 @@ Bütün 7 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarı
 Hər servisin öz `.env`-i var (bax hər qovluqdakı `.env.example`). Sırası fərq etmir, amma tam funksionallıq üçün hamısı ayaqda olmalıdır. Tam addım-addım təlimat və nümunə API çağırışları üçün bax [README.md](README.md).
 
 ```bash
-# 7 ayrı terminalda:
+# 8 ayrı terminalda:
 cd notification-service   && go run ./cmd/api   # :8083
 cd authorization-service  && go run ./cmd/api   # :8084
 cd registration-service   && go run ./cmd/api   # :8081
@@ -124,6 +133,7 @@ cd user-service           && go run ./cmd/api   # :8082
 cd shop-role-service      && go run ./cmd/api   # :8085
 cd shop-service           && go run ./cmd/api   # :8086
 cd shop-product-service   && go run ./cmd/api   # :8087
+cd shop-chat-service      && go run ./cmd/api   # :8088
 ```
 
 Hər servisin öz Swagger UI-ı var: `http://localhost:<port>/swagger/index.html`

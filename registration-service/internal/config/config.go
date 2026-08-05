@@ -33,16 +33,16 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{
-		DBHost:              getEnv("DB_HOST", "localhost"),
-		DBPort:              getEnv("DB_PORT", "5432"),
-		DBUser:              getEnv("DB_USER", "postgres"),
-		DBPassword:          getEnv("DB_PASSWORD", ""),
-		DBName:              getEnv("DB_NAME", "postgres"),
-		DBSSLMode:           getEnv("DB_SSLMODE", "disable"),
-		JWTSecret:           getEnv("JWT_SECRET", ""),
-		JWTTTLMinutes:       ttl,
-		Port:                getEnv("PORT", "8081"),
-		NotificationBaseURL: getEnv("NOTIFICATION_SERVICE_URL", "http://localhost:8083"),
+		DBHost:               getEnv("DB_HOST", "localhost"),
+		DBPort:               getEnv("DB_PORT", "5432"),
+		DBUser:               getEnv("DB_USER", "postgres"),
+		DBPassword:           getEnv("DB_PASSWORD", ""),
+		DBName:               getEnv("DB_NAME", "postgres"),
+		DBSSLMode:            getEnv("DB_SSLMODE", "disable"),
+		JWTSecret:            getEnv("JWT_SECRET", ""),
+		JWTTTLMinutes:        ttl,
+		Port:                 getEnv("PORT", "8081"),
+		NotificationBaseURL:  getEnv("NOTIFICATION_SERVICE_URL", "http://localhost:8083"),
 		AuthorizationBaseURL: getEnv("AUTHORIZATION_SERVICE_URL", "http://localhost:8084"),
 	}
 
