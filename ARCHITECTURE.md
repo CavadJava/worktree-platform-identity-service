@@ -1,6 +1,6 @@
 # Arxitektura
 
-10 ayrı Go mikroservisi, ortaq bir PostgreSQL instansiyasına (`localhost:5433`) qoşulur.
+13 ayrı Go mikroservisi, ortaq bir PostgreSQL instansiyasına (`localhost:5433`) qoşulur.
 
 ```
  registration-service :8081 ──POST /notifications──▶ notification-service :8083
@@ -56,6 +56,7 @@
 | localization-service          | 8090 | çoxdilli mətn/xəta mesajları (az/en/ru)                | var, `translations` sxeminin sahibi | authorization-service |
 | log-service                    | 8091 | mərkəzi log anbarı (bütün servislərin request logları) | var, `service_logs` sxeminin sahibi | - |
 | shop-category-service          | 8092 | sistem-səviyyəli kataloq (kateqoriya/alt-kateqoriya)   | var, `categories`/`subcategories` sxemlərinin sahibi | authorization-service |
+| review-service                  | 8093 | məhsul rəyi (reyting + mətn) + şəkil/video əlavələri   | var, `reviews`/`review_media` sxemlərinin sahibi | authorization-service |
 
 ## Niyə belə bölündü
 
@@ -114,6 +115,10 @@ Mağaza sahibi öz mağazası üçün taksonomiya təyin edə bilər: `ProductTy
 
 Sistem-səviyyəli gəzinti kataloqu — `categories` (məs. "Women's Fashion") və `subcategories` (məs. "Women's Dresses", `ON DELETE CASCADE`). Yalnız administrator idarə edir, oxumaq public-dir. ID-lər oxunaqlı slug-lardır (`women-fashion`) — startup-da 10 kateqoriya + 57 alt-kateqoriyalıq default kataloq idempotent seed edilir (admin redaktələri əzilmir), `id` verilmədən yaradılanda addan avtomatik slug düzəldilir. Mağaza-scoped `product_types`/`product_subtypes`-dən fərqlidir: o, hər mağazanın öz daxili taksonomiyasıdır, bu isə bütün marketplace-in kataloq ağacıdır.
 
+## Rəylər ([review-service](review-service), :8093)
+
+Məhsula reyting (1-5) + mətn yazıla bilər, üstünə şəkil/video əlavə edilə bilər — `reviews` və `review_media` iki ayrı cədvəldir (bir rəyin bir neçə media faylı ola bilər), `POST /products/{id}/reviews` ilə rəy yaradılır, sonra `POST /reviews/{id}/media` ilə (ayrıca, `multipart/form-data`) fayl(lar) əlavə olunur. Fayllar diskdə saxlanılır, DB-də isə nisbi yol (`/media/reviews/<review_id>/<fayl>`) — client öz HOST-unu qoşub tam URL qurur, API çağırışlarında olduğu kimi; `/media/*` isə JSON zərfsiz, xam fayl serving-idir. Content-Type whitelist ilə yoxlanılır (jpeg/png/webp/heic şəkil, mp4/mov video), max 25MB. İcazə modeli sadədir: istənilən authenticated istifadəçi rəy yaza bilər, silmək/media əlavə etmək isə yalnız rəyin sahibinə aiddir (admin override yoxdur — `Product`/`ProductItem`-in mağaza-hierarxiyalı icazə modelindən fərqli olaraq, burada sahiblik kifayətdir).
+
 ## İstifadəçi-tərəfli funksiyalar: favoritlər, abunəlik, yazışma
 
 Bunlar istənilən login olmuş istifadəçi üçün açıqdır (sahiblik/səviyyə tələb olunmur — sadəcə auth):
@@ -140,11 +145,11 @@ Bütün servislər hər bitmiş HTTP sorğusunu (method, path, status, müddət 
 
 ## CORS
 
-Bütün 12 servis `github.com/go-chi/cors` ilə brauzer-mənşəli sorğulara icazə verir — default olaraq `http://localhost:5173` (Vite dev server) `CORS_ALLOWED_ORIGINS` env dəyişəni ilə tənzimlənir (vergüllə ayrılmış siyahı). `Authorization`, `Content-Type` başlıqlarına və `GET/POST/PUT/DELETE/OPTIONS` metodlarına icazə verilir.
+Bütün 13 servis `github.com/go-chi/cors` ilə brauzer-mənşəli sorğulara icazə verir — default olaraq `http://localhost:5173` (Vite dev server) `CORS_ALLOWED_ORIGINS` env dəyişəni ilə tənzimlənir (vergüllə ayrılmış siyahı). `Authorization`, `Content-Type` başlıqlarına və `GET/POST/PUT/DELETE/OPTIONS` metodlarına icazə verilir.
 
 ## Cavab formatı (uğur/xəta)
 
-Bütün 12 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarır:
+Bütün 13 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarır:
 
 ```json
 // uğurlu:
@@ -174,6 +179,7 @@ cd shop-order-service     && go run ./cmd/api   # :8089
 cd localization-service   && go run ./cmd/api   # :8090
 cd log-service            && go run ./cmd/api   # :8091
 cd shop-category-service  && go run ./cmd/api   # :8092
+cd review-service         && go run ./cmd/api   # :8093
 ```
 
 Hər servisin öz Swagger UI-ı var: `http://localhost:<port>/swagger/index.html`
