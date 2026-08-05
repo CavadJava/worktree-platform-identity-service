@@ -1,0 +1,108 @@
+basePath: /api/v1
+definitions:
+  internal_handlers.updateProfileRequest:
+    properties:
+      full_name:
+        type: string
+      phone:
+        type: string
+    type: object
+  user-service_internal_models.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: string
+      phone:
+        type: string
+      updated_at:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: İstifadəçi profilinin oxunması/yenilənməsi üçün REST API. Auth doğrulaması
+    authorization-service-ə həvalə edilir.
+  title: User Service API
+  version: "1.0"
+paths:
+  /profile:
+    get:
+      description: JWT token-ə uyğun istifadəçinin profilini qaytarır (registration-service-in
+        verdiyi token).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user-service_internal_models.User'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get current user's profile
+      tags:
+      - profile
+    put:
+      consumes:
+      - application/json
+      description: full_name və phone sahələrini yeniləyir (email dəyişmir, registration-service
+        tərəfindən idarə olunur).
+      parameters:
+      - description: Profile update payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.updateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user-service_internal_models.User'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update current user's profile
+      tags:
+      - profile
+securityDefinitions:
+  BearerAuth:
+    description: Bearer token formatında JWT (registration-service /login cavabından).
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

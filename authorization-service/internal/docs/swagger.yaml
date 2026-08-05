@@ -1,0 +1,49 @@
+basePath: /api/v1
+definitions:
+  internal_handlers.authorizeResponse:
+    properties:
+      role:
+        type: string
+      shop_id:
+        type: string
+      shop_role_level:
+        type: integer
+      user_id:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: registration-service-in verdiyi JWT-ləri doğrulayır. Digər servislər
+    qorunan endpoint-lərə gələn sorğuları bura yönləndirib doğrulatdırır.
+  title: Authorization Service API
+  version: "1.0"
+paths:
+  /authorize:
+    post:
+      description: Digər servislərin (məs. user-service) qorunan endpoint-lərə gələn
+        sorğuları doğrulamaq üçün çağırdığı endpoint. Authorization başlığındakı JWT-ni
+        yoxlayır və sahibinin user_id-sini qaytarır.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.authorizeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Verify a bearer token
+      tags:
+      - authorize
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

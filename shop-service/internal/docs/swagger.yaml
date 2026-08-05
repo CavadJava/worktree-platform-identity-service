@@ -1,0 +1,466 @@
+basePath: /api/v1
+definitions:
+  internal_handlers.applicationRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    type: object
+  internal_handlers.rejectRequest:
+    properties:
+      reason:
+        type: string
+    type: object
+  internal_handlers.shopRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    type: object
+  shop-service_internal_models.Shop:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      owner_id:
+        type: string
+      temporary:
+        type: boolean
+      updated_at:
+        type: string
+    type: object
+  shop-service_internal_models.ShopApplication:
+    properties:
+      applicant_id:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      review_note:
+        type: string
+      reviewer_id:
+        type: string
+      shop_id:
+        type: string
+      status:
+        type: string
+      template_version:
+        type: string
+      updated_at:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Mağazaların CRUD idarəetməsi + mağaza açma müraciəti/təsdiq axını.
+    Birbaşa yaratma yalnız administrator üçündür; adi istifadəçilər /shop-applications
+    ilə müraciət edir, administrator formu göndərəndə (send-form) müvəqqəti mağaza
+    yaranır və müraciət sahibi onun admin(4) səviyyəli sahibi olur, yekun approve
+    ilə mağaza daimi olur.
+  title: Shop Service API
+  version: "1.0"
+paths:
+  /shop-applications:
+    get:
+      parameters:
+      - description: pending | form_sent | approved | rejected
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/shop-service_internal_models.ShopApplication'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List shop applications (administrator only)
+      tags:
+      - shop-applications
+    post:
+      consumes:
+      - application/json
+      description: İstənilən login olmuş istifadəçi müraciət göndərə bilər. Müraciət
+        "pending" statusunda yaranır — administrator ya birbaşa rədd edir, ya da formu
+        göndərir (/send-form), bundan sonra mağaza açılır.
+      parameters:
+      - description: Application payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.applicationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/shop-service_internal_models.ShopApplication'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Apply to open a shop
+      tags:
+      - shop-applications
+  /shop-applications/{id}:
+    get:
+      description: Administrator, ya da müraciəti göndərən istifadəçinin özü baxa
+        bilər.
+      parameters:
+      - description: Application ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/shop-service_internal_models.ShopApplication'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get a shop application
+      tags:
+      - shop-applications
+  /shop-applications/{id}/approve:
+    post:
+      description: Yalnız "form_sent" statusundan çağırıla bilər. Müvəqqəti mağazanı
+        daimi edir (public siyahılarda görünməyə başlayır).
+      parameters:
+      - description: Application ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/shop-service_internal_models.ShopApplication'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Approve a shop application (administrator only)
+      tags:
+      - shop-applications
+  /shop-applications/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: '"pending" statusundan (heç bir mağaza yaranmayıb) və ya "form_sent"
+        statusundan (müvəqqəti mağaza silinir, təyinat geri alınır) çağırıla bilər.'
+      parameters:
+      - description: Application ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Reject payload
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/internal_handlers.rejectRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/shop-service_internal_models.ShopApplication'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Reject a shop application (administrator only)
+      tags:
+      - shop-applications
+  /shop-applications/{id}/send-form:
+    post:
+      description: 'Müraciəti irəli aparmaq qərarı: müvəqqəti mağaza yaradır, müraciət
+        sahibini onun admin(4) səviyyəsinə təyin edir ki, mağaza məlumatlarını özü
+        doldursun (PUT /shops/{id}). Mağaza yekun təsdiqə qədər (approve) public siyahılarda
+        görünmür.'
+      parameters:
+      - description: Application ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/shop-service_internal_models.ShopApplication'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Send the shop form (administrator only)
+      tags:
+      - shop-applications
+  /shops:
+    get:
+      parameters:
+      - description: Filter by owner
+        in: query
+        name: owner_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/shop-service_internal_models.Shop'
+            type: array
+      summary: List shops
+      tags:
+      - shops
+    post:
+      consumes:
+      - application/json
+      description: Adi istifadəçilər mağazanı bu endpoint ilə deyil, /shop-applications
+        müraciət+təsdiq axını ilə açır. Bu endpoint yalnız administratorun birbaşa
+        yaratması üçündür.
+      parameters:
+      - description: Shop payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.shopRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/shop-service_internal_models.Shop'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a shop directly (administrator only)
+      tags:
+      - shops
+  /shops/{id}:
+    delete:
+      description: Yalnız admin(4) səviyyəli mağaza əməkdaşı və ya administrator.
+      parameters:
+      - description: Shop ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a shop
+      tags:
+      - shops
+    get:
+      parameters:
+      - description: Shop ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/shop-service_internal_models.Shop'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get a shop
+      tags:
+      - shops
+    put:
+      consumes:
+      - application/json
+      description: review(3) və admin(4) səviyyəli öz mağaza əməkdaşları və ya administrator.
+      parameters:
+      - description: Shop ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Shop payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.shopRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/shop-service_internal_models.Shop'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update a shop
+      tags:
+      - shops
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

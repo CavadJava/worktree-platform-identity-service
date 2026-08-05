@@ -1,0 +1,72 @@
+package main
+
+import (
+	"log"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
+
+	"shop-product-service/internal/client"
+	appconfig "shop-product-service/internal/config"
+	"shop-product-service/internal/database"
+	_ "shop-product-service/internal/docs"
+	"shop-product-service/internal/handlers"
+	appmiddleware "shop-product-service/internal/middleware"
+	"shop-product-service/internal/repository"
+	"shop-product-service/internal/service"
+)
+
+// @title           Shop Product Service API
+// @version         1.0
+// @description     Mağaza məhsullarının CRUD idarəetməsi. Yaratma/yeniləmə/silmə üçün mağazaya həmin istifadəçi aid olmalı (JWT-də shop_id/shop_role_level ilə) və lazımi səviyyəyə sahib olmalıdır; və ya administrator.
+// @BasePath        /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+func main() {
+	cfg := appconfig.Load()
+
+	db, err := database.Connect(cfg)
+	if err != nil {
+		log.Fatalf("database error: %v", err)
+	}
+	defer db.Close()
+
+	if err := database.Migrate(db); err != nil {
+		log.Fatalf("migration error: %v", err)
+	}
+
+	productRepo := repository.NewProductRepository(db)
+	authClient := client.NewAuthorizationClient(cfg.AuthorizationBaseURL)
+	productService := service.NewProductService(productRepo)
+	productHandler := handlers.NewProductHandler(productService)
+
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
+
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Get("/products", productHandler.List)
+		r.Get("/products/{id}", productHandler.Get)
+
+		r.Group(func(r chi.Router) {
+			r.Use(appmiddleware.RequireAuth(authClient))
+			r.Post("/products", productHandler.Create)
+			r.Put("/products/{id}", productHandler.Update)
+			r.Delete("/products/{id}", productHandler.Delete)
+		})
+	})
+
+	log.Printf("shop-product-service listening on :%s", cfg.Port)
+	if err := http.ListenAndServe(":"+cfg.Port, r); err != nil {
+		log.Fatalf("server error: %v", err)
+	}
+}

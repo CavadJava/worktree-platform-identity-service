@@ -1,0 +1,156 @@
+basePath: /api/v1
+definitions:
+  internal_handlers.assignRequest:
+    properties:
+      shop_id:
+        type: string
+      shop_role_level:
+        type: integer
+      user_id:
+        type: string
+    type: object
+  internal_handlers.assignmentResponse:
+    properties:
+      shop_id:
+        type: string
+      shop_role_level:
+        type: integer
+      user_id:
+        type: string
+    type: object
+  internal_handlers.revokeRequest:
+    properties:
+      user_id:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: 'İstifadəçini bir mağazaya hierarxik səviyyə ilə təyin edir: admin(4)
+    > review(3) > add-product(2) > chat(1). Yalnız administrator çağıra bilər.'
+  title: Shop Role Service API
+  version: "1.0"
+paths:
+  /roles/{user_id}:
+    get:
+      parameters:
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.assignmentResponse'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get a user's shop assignment
+      tags:
+      - roles
+  /roles/assign:
+    post:
+      consumes:
+      - application/json
+      description: admin(4) > review(3) > add-product(2) > chat(1). Yalnız administrator
+        çağıra bilər. Bir istifadəçi eyni anda yalnız bir mağazaya aid ola bilər.
+      parameters:
+      - description: Assign payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.assignRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.assignmentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Assign a user to a shop with a hierarchical level
+      tags:
+      - roles
+  /roles/revoke:
+    post:
+      consumes:
+      - application/json
+      description: shop_id-ni sıfırlayır və şəviyyəni 0-a endirir. Yalnız administrator
+        çağıra bilər.
+      parameters:
+      - description: Revoke payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.revokeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.assignmentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Remove a user from their shop
+      tags:
+      - roles
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

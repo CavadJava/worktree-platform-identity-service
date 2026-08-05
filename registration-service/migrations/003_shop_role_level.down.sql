@@ -1,0 +1,3 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS shopping_roles TEXT NOT NULL DEFAULT '["user"]';
+ALTER TABLE users DROP COLUMN IF EXISTS shop_id;
+ALTER TABLE users DROP COLUMN IF EXISTS shop_role_level;

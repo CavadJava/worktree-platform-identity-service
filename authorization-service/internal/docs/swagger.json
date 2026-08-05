@@ -1,0 +1,72 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "registration-service-in verdiyi JWT-ləri doğrulayır. Digər servislər qorunan endpoint-lərə gələn sorğuları bura yönləndirib doğrulatdırır.",
+        "title": "Authorization Service API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/api/v1",
+    "paths": {
+        "/authorize": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Digər servislərin (məs. user-service) qorunan endpoint-lərə gələn sorğuları doğrulamaq üçün çağırdığı endpoint. Authorization başlığındakı JWT-ni yoxlayır və sahibinin user_id-sini qaytarır.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorize"
+                ],
+                "summary": "Verify a bearer token",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.authorizeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "internal_handlers.authorizeResponse": {
+            "type": "object",
+            "properties": {
+                "role": {
+                    "type": "string"
+                },
+                "shop_id": {
+                    "type": "string"
+                },
+                "shop_role_level": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

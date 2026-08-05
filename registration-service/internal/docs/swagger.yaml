@@ -1,0 +1,118 @@
+basePath: /api/v1
+definitions:
+  internal_handlers.loginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  internal_handlers.loginResponse:
+    properties:
+      expires_at:
+        type: string
+      token:
+        type: string
+    type: object
+  internal_handlers.registerRequest:
+    properties:
+      email:
+        type: string
+      full_name:
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+    type: object
+  registration-service_internal_models.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: string
+      phone:
+        type: string
+      updated_at:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: İstifadəçi qeydiyyatı və login üçün REST API. Uğurlu qeydiyyatdan sonra
+    notification-service-ə mock bildiriş göndərilir.
+  title: Registration Service API
+  version: "1.0"
+paths:
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Email/password ilə login olub JWT token alır.
+      parameters:
+      - description: Login payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.loginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: invalid email or password
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login
+      tags:
+      - auth
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: Yeni istifadəçi qeydiyyatı. Email unikal olmalıdır.
+      parameters:
+      - description: Registration payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/registration-service_internal_models.User'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: email already registered
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register a new user
+      tags:
+      - auth
+swagger: "2.0"

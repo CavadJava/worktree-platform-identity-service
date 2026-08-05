@@ -1,0 +1,55 @@
+basePath: /api/v1
+definitions:
+  internal_handlers.sendNotificationRequest:
+    properties:
+      full_name:
+        type: string
+      message:
+        type: string
+      to:
+        type: string
+      type:
+        type: string
+    type: object
+  internal_handlers.sendNotificationResponse:
+    properties:
+      status:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Bildirişləri qəbul edib (mock) göndərən REST API. Real provider inteqrasiyası
+    yoxdur, konsola loglayır.
+  title: Notification Service API
+  version: "1.0"
+paths:
+  /notifications:
+    post:
+      consumes:
+      - application/json
+      description: Bildirişi real olaraq göndərmir — konsola loglayır (mock). Real
+        provider (SMTP/SMS) əlavə etmək üçün buraya inteqrasiya edilə bilər.
+      parameters:
+      - description: Notification payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.sendNotificationRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/internal_handlers.sendNotificationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Send a notification (mocked)
+      tags:
+      - notifications
+swagger: "2.0"

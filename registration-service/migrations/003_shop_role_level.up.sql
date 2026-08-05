@@ -1,0 +1,4 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS shop_id UUID;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS shop_role_level INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users DROP COLUMN IF EXISTS shopping_roles;
+CREATE INDEX IF NOT EXISTS idx_users_shop_id ON users (shop_id);
