@@ -12,6 +12,7 @@ import (
 	appconfig "notification-service/internal/config"
 	_ "notification-service/internal/docs"
 	"notification-service/internal/handlers"
+	"notification-service/internal/logclient"
 )
 
 // @title           Notification Service API
@@ -33,6 +34,7 @@ func main() {
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
+	r.Use(logclient.RequestLogger(logclient.New(cfg.LogServiceURL, "notification-service")))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))

@@ -1,6 +1,6 @@
 # go-project-practices
 
-10 ayrı Go mikroservisi: qeydiyyat/login, profil, bildiriş, autorizasiya, mağaza rolları, mağaza CRUD + müraciət axını + abunəlik, məhsul CRUD + favoritlər, istifadəçi↔mağaza yazışması, sifarişlər, çoxdilli mətnlər. Arxitektura və servislərin bir-biri ilə əlaqəsi üçün bax [ARCHITECTURE.md](ARCHITECTURE.md).
+11 ayrı Go mikroservisi: qeydiyyat/login, profil, bildiriş, autorizasiya, mağaza rolları, mağaza CRUD + müraciət axını + abunəlik, məhsul CRUD + favoritlər, istifadəçi↔mağaza yazışması, sifarişlər, çoxdilli mətnlər, mərkəzi loglama. Arxitektura və servislərin bir-biri ilə əlaqəsi üçün bax [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Tələblər
 
@@ -10,7 +10,7 @@
 
 ## Servisləri işə salmaq
 
-Hər servisin öz `.env`-i var (repo-da hazır, lokal inkişaf üçün). 10 ayrı terminalda:
+Hər servisin öz `.env`-i var (repo-da hazır, lokal inkişaf üçün). 11 ayrı terminalda:
 
 ```bash
 cd notification-service   && go run ./cmd/api   # :8083
@@ -23,12 +23,13 @@ cd shop-product-service   && go run ./cmd/api   # :8087
 cd shop-chat-service      && go run ./cmd/api   # :8088
 cd shop-order-service     && go run ./cmd/api   # :8089
 cd localization-service   && go run ./cmd/api   # :8090
+cd log-service            && go run ./cmd/api   # :8091
 ```
 
 Sıra fərq etmir, amma tam axın üçün hamısı ayaqda olmalıdır. Yoxlamaq:
 
 ```bash
-for p in 8081 8082 8083 8084 8085 8086 8087 8088 8089 8090; do curl -s http://localhost:$p/health; echo " :$p"; done
+for p in 8081 8082 8083 8084 8085 8086 8087 8088 8089 8090 8091; do curl -s http://localhost:$p/health; echo " :$p"; done
 ```
 
 Hər servisin Swagger UI-ı: `http://localhost:<port>/swagger/index.html`
@@ -36,6 +37,20 @@ Hər servisin Swagger UI-ı: `http://localhost:<port>/swagger/index.html`
 ## CORS
 
 Bütün servislər default olaraq `http://localhost:5173`-dən (Vite dev server) gələn brauzer sorğularına icazə verir — `CORS_ALLOWED_ORIGINS` env dəyişəni ilə (vergüllə ayrılmış siyahı) hər servisdə fərdi tənzimlənə bilər. Frontend inkişafı zamanı əlavə CORS konfiqurasiyası tələb olunmur.
+
+## Mərkəzi loglama
+
+Bütün servislər hər HTTP sorğusunu (method, path, status, müddət) avtomatik [log-service](log-service)-ə (:8091) göndərir — fire-and-forget, əsas sorğunu heç vaxt bloklamır. Servisləri bir yerdən izləmək:
+
+```bash
+# Son loglar (bütün servislər):
+curl "http://localhost:8091/api/v1/logs"
+
+# Bir servisin errorları:
+curl "http://localhost:8091/api/v1/logs?service=shop-order-service&level=error"
+```
+
+`5xx → error`, `4xx → warn`, qalanı `info`. `LOG_SERVICE_URL` env dəyişəni ilə tənzimlənir.
 
 ## Cavab formatı
 
@@ -375,3 +390,4 @@ curl "http://localhost:8090/api/v1/locales"
 | İstifadəçi↔mağaza yazışması | [shop-chat-service](shop-chat-service) | 8088 | [README](shop-chat-service/README.md) |
 | Sifarişlər | [shop-order-service](shop-order-service) | 8089 | [README](shop-order-service/README.md) |
 | Çoxdilli mətnlər | [localization-service](localization-service) | 8090 | [README](localization-service/README.md) |
+| Mərkəzi loglama | [log-service](log-service) | 8091 | [README](log-service/README.md) |

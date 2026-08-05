@@ -19,6 +19,7 @@ type Config struct {
 
 	Port               string
 	CORSAllowedOrigins []string
+	LogServiceURL      string
 }
 
 func Load() *Config {
@@ -34,6 +35,7 @@ func Load() *Config {
 		AuthorizationBaseURL: getEnv("AUTHORIZATION_SERVICE_URL", "http://localhost:8084"),
 		Port:                 getEnv("PORT", "8088"),
 		CORSAllowedOrigins:   strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
+		LogServiceURL:        getEnv("LOG_SERVICE_URL", "http://localhost:8091"),
 	}
 }
 

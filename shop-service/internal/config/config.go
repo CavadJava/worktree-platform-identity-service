@@ -20,6 +20,7 @@ type Config struct {
 
 	Port               string
 	CORSAllowedOrigins []string
+	LogServiceURL      string
 }
 
 func Load() *Config {
@@ -36,6 +37,7 @@ func Load() *Config {
 		NotificationBaseURL:  getEnv("NOTIFICATION_SERVICE_URL", "http://localhost:8083"),
 		Port:                 getEnv("PORT", "8086"),
 		CORSAllowedOrigins:   strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
+		LogServiceURL:        getEnv("LOG_SERVICE_URL", "http://localhost:8091"),
 	}
 }
 

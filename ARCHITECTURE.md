@@ -54,6 +54,7 @@
 | shop-chat-service           | 8088 | istifadəçi ↔ mağaza yazışması                          | var, `conversations`/`messages` sxemlərinin sahibi | authorization-service |
 | shop-order-service           | 8089 | sifariş yaratma/siyahı                                 | var, `orders`/`order_items` sxemlərinin sahibi + `users`/`shops`/`products`-ı oxuyur | authorization-service |
 | localization-service          | 8090 | çoxdilli mətn/xəta mesajları (az/en/ru)                | var, `translations` sxeminin sahibi | authorization-service |
+| log-service                    | 8091 | mərkəzi log anbarı (bütün servislərin request logları) | var, `service_logs` sxeminin sahibi | - |
 
 ## Niyə belə bölündü
 
@@ -128,13 +129,17 @@ Bunlar istənilən login olmuş istifadəçi üçün açıqdır (sahiblik/səviy
 
 `translations (namespace, key, locale, value)` — unikal `(namespace, key, locale)`. İlk açılışda bütün servislərin response-envelope-unda artıq istifadə olunan error code-ları (`bad_request`, `unauthorized`, `forbidden`, `not_found`, `conflict`, `internal_error`, `service_unavailable`, `error`) `errors` namespace-i altında az/en/ru dillərində avtomatik yüklənir (idempotent seed, admin redaktələrini əzmir) — bu, `error.code`-u alıb lokallaşdırılmış mesaj göstərmək istəyən istənilən client üçün hazır inteqrasiya nöqtəsidir. Oxumaq (`list`/`map`/`lookup`/`locales`) public-dir; yazmaq yalnız administrator üçündür. `lookup` sorğulanan locale tapılmasa `DEFAULT_LOCALE`-a (default `az`) fallback edir.
 
+## Mərkəzi loglama ([log-service](log-service), :8091)
+
+Bütün servislər hər bitmiş HTTP sorğusunu (method, path, status, müddət ms-lə) log-service-ə göndərir — `service_logs` cədvəlində toplanır, `GET /logs` ilə servis/səviyyə/path/tarix üzrə filtrlənir. Hər servisdəki `internal/logclient` paketi **fire-and-forget** işləyir: göndərmə ayrıca goroutine-də 2s timeout ilə gedir, log-service dayansa belə əsas sorğu təsirlənmir (bilinçli seçim — loglama müşahidə vasitəsidir, asılılıq deyil; buna görə də cədvəldə log-service-in "asılılıqlar" sütunu boşdur və heç bir servis ona bloklanan çağırış etmir). Səviyyə cavab statusundan avtomatik: `5xx → error`, `4xx → warn`, qalanı `info`. `/health` və `/swagger` sorğuları loglanmır (səs-küy). `LOG_SERVICE_URL` env dəyişəni ilə tənzimlənir.
+
 ## CORS
 
-Bütün 10 servis `github.com/go-chi/cors` ilə brauzer-mənşəli sorğulara icazə verir — default olaraq `http://localhost:5173` (Vite dev server) `CORS_ALLOWED_ORIGINS` env dəyişəni ilə tənzimlənir (vergüllə ayrılmış siyahı). `Authorization`, `Content-Type` başlıqlarına və `GET/POST/PUT/DELETE/OPTIONS` metodlarına icazə verilir.
+Bütün 11 servis `github.com/go-chi/cors` ilə brauzer-mənşəli sorğulara icazə verir — default olaraq `http://localhost:5173` (Vite dev server) `CORS_ALLOWED_ORIGINS` env dəyişəni ilə tənzimlənir (vergüllə ayrılmış siyahı). `Authorization`, `Content-Type` başlıqlarına və `GET/POST/PUT/DELETE/OPTIONS` metodlarına icazə verilir.
 
 ## Cavab formatı (uğur/xəta)
 
-Bütün 10 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarır:
+Bütün 11 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarır:
 
 ```json
 // uğurlu:
@@ -151,7 +156,7 @@ Bütün 10 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytar�
 Hər servisin öz `.env`-i var (bax hər qovluqdakı `.env.example`). Sırası fərq etmir, amma tam funksionallıq üçün hamısı ayaqda olmalıdır. Tam addım-addım təlimat və nümunə API çağırışları üçün bax [README.md](README.md).
 
 ```bash
-# 10 ayrı terminalda:
+# 11 ayrı terminalda:
 cd notification-service   && go run ./cmd/api   # :8083
 cd authorization-service  && go run ./cmd/api   # :8084
 cd registration-service   && go run ./cmd/api   # :8081
@@ -162,6 +167,7 @@ cd shop-product-service   && go run ./cmd/api   # :8087
 cd shop-chat-service      && go run ./cmd/api   # :8088
 cd shop-order-service     && go run ./cmd/api   # :8089
 cd localization-service   && go run ./cmd/api   # :8090
+cd log-service            && go run ./cmd/api   # :8091
 ```
 
 Hər servisin öz Swagger UI-ı var: `http://localhost:<port>/swagger/index.html`

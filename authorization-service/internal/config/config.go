@@ -12,6 +12,7 @@ type Config struct {
 	JWTSecret          string
 	Port               string
 	CORSAllowedOrigins []string
+	LogServiceURL      string
 }
 
 func Load() (*Config, error) {
@@ -21,6 +22,7 @@ func Load() (*Config, error) {
 		JWTSecret:          getEnv("JWT_SECRET", ""),
 		Port:               getEnv("PORT", "8084"),
 		CORSAllowedOrigins: strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
+		LogServiceURL:      getEnv("LOG_SERVICE_URL", "http://localhost:8091"),
 	}
 
 	if cfg.JWTSecret == "" {

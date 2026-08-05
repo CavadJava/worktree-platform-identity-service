@@ -14,6 +14,7 @@ import (
 	"shop-order-service/internal/database"
 	_ "shop-order-service/internal/docs"
 	"shop-order-service/internal/handlers"
+	"shop-order-service/internal/logclient"
 	appmiddleware "shop-order-service/internal/middleware"
 	"shop-order-service/internal/repository"
 	"shop-order-service/internal/service"
@@ -56,6 +57,7 @@ func main() {
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
+	r.Use(logclient.RequestLogger(logclient.New(cfg.LogServiceURL, "shop-order-service")))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))

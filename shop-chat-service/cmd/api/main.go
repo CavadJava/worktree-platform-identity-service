@@ -14,6 +14,7 @@ import (
 	"shop-chat-service/internal/database"
 	_ "shop-chat-service/internal/docs"
 	"shop-chat-service/internal/handlers"
+	"shop-chat-service/internal/logclient"
 	appmiddleware "shop-chat-service/internal/middleware"
 	"shop-chat-service/internal/repository"
 	"shop-chat-service/internal/service"
@@ -56,6 +57,7 @@ func main() {
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
+	r.Use(logclient.RequestLogger(logclient.New(cfg.LogServiceURL, "shop-chat-service")))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))

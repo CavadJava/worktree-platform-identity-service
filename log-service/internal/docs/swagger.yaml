@@ -1,0 +1,135 @@
+basePath: /api/v1
+definitions:
+  handlers.logRequest:
+    properties:
+      duration_ms:
+        type: integer
+      level:
+        type: string
+      message:
+        type: string
+      method:
+        type: string
+      path:
+        type: string
+      service:
+        type: string
+      status:
+        type: integer
+    type: object
+  models.LogEntry:
+    properties:
+      created_at:
+        type: string
+      duration_ms:
+        type: integer
+      id:
+        type: string
+      level:
+        type: string
+      message:
+        type: string
+      method:
+        type: string
+      path:
+        type: string
+      service:
+        type: string
+      status:
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: Mərkəzi log anbarı — bütün servislər öz request/error loglarını buraya
+    göndərir; servis, səviyyə və tarix üzrə filtrlə izləmək mümkündür.
+  title: Log Service API
+  version: "1.0"
+paths:
+  /logs:
+    get:
+      description: Servis, səviyyə, path və tarix aralığı üzrə filtr. Ən yenilər əvvəldə.
+      parameters:
+      - description: Service name
+        in: query
+        name: service
+        type: string
+      - description: info | warn | error
+        in: query
+        name: level
+        type: string
+      - description: Path substring (ILIKE)
+        in: query
+        name: path
+        type: string
+      - description: RFC3339, e.g. 2026-08-05T00:00:00Z
+        in: query
+        name: from
+        type: string
+      - description: RFC3339
+        in: query
+        name: to
+        type: string
+      - description: Default 100, max 500
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.LogEntry'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Query logs
+      tags:
+      - logs
+    post:
+      consumes:
+      - application/json
+      description: Digər servislər öz request/error loglarını buraya göndərir (fire-and-forget).
+      parameters:
+      - description: Log entry
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.logRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.LogEntry'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Ingest a log entry
+      tags:
+      - logs
+  /logs/services:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+      summary: List services that have sent logs
+      tags:
+      - logs
+swagger: "2.0"

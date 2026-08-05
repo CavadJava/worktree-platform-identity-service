@@ -14,6 +14,7 @@ import (
 	"localization-service/internal/database"
 	_ "localization-service/internal/docs"
 	"localization-service/internal/handlers"
+	"localization-service/internal/logclient"
 	appmiddleware "localization-service/internal/middleware"
 	"localization-service/internal/repository"
 	"localization-service/internal/service"
@@ -54,6 +55,7 @@ func main() {
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
+	r.Use(logclient.RequestLogger(logclient.New(cfg.LogServiceURL, "localization-service")))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))

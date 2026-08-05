@@ -13,6 +13,7 @@ import (
 	appconfig "authorization-service/internal/config"
 	_ "authorization-service/internal/docs"
 	"authorization-service/internal/handlers"
+	"authorization-service/internal/logclient"
 )
 
 // @title           Authorization Service API
@@ -41,6 +42,7 @@ func main() {
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
+	r.Use(logclient.RequestLogger(logclient.New(cfg.LogServiceURL, "authorization-service")))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))

@@ -14,6 +14,7 @@ import (
 	"user-service/internal/database"
 	_ "user-service/internal/docs"
 	"user-service/internal/handlers"
+	"user-service/internal/logclient"
 	appmiddleware "user-service/internal/middleware"
 	"user-service/internal/repository"
 	"user-service/internal/service"
@@ -54,6 +55,7 @@ func main() {
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
+	r.Use(logclient.RequestLogger(logclient.New(cfg.LogServiceURL, "user-service")))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))
