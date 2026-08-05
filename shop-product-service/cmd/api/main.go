@@ -42,13 +42,17 @@ func main() {
 	productRepo := repository.NewProductRepository(db)
 	favoriteRepo := repository.NewFavoriteRepository(db)
 	itemRepo := repository.NewProductItemRepository(db)
+	productTypeRepo := repository.NewProductTypeRepository(db)
+	productSubtypeRepo := repository.NewProductSubtypeRepository(db)
 	authClient := client.NewAuthorizationClient(cfg.AuthorizationBaseURL)
-	productService := service.NewProductService(productRepo)
+	productService := service.NewProductService(productRepo, productTypeRepo)
 	favoriteService := service.NewFavoriteService(favoriteRepo, productRepo)
 	itemService := service.NewProductItemService(itemRepo, productRepo)
+	productTypeService := service.NewProductTypeService(productTypeRepo, productSubtypeRepo)
 	productHandler := handlers.NewProductHandler(productService)
 	favoriteHandler := handlers.NewFavoriteHandler(favoriteService)
 	itemHandler := handlers.NewProductItemHandler(itemService)
+	productTypeHandler := handlers.NewProductTypeHandler(productTypeService)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -72,6 +76,9 @@ func main() {
 		r.Get("/products/{id}", productHandler.Get)
 		r.Get("/products/{product_id}/items", itemHandler.List)
 		r.Get("/product-items/{id}", itemHandler.Get)
+		r.Get("/product-types", productTypeHandler.ListTypes)
+		r.Get("/product-types/{id}", productTypeHandler.GetType)
+		r.Get("/product-types/{type_id}/subtypes", productTypeHandler.ListSubtypes)
 
 		r.Group(func(r chi.Router) {
 			r.Use(appmiddleware.RequireAuth(authClient))
@@ -86,6 +93,13 @@ func main() {
 			r.Post("/products/{product_id}/items", itemHandler.Create)
 			r.Put("/product-items/{id}", itemHandler.Update)
 			r.Delete("/product-items/{id}", itemHandler.Delete)
+
+			r.Post("/product-types", productTypeHandler.CreateType)
+			r.Put("/product-types/{id}", productTypeHandler.UpdateType)
+			r.Delete("/product-types/{id}", productTypeHandler.DeleteType)
+			r.Post("/product-types/{type_id}/subtypes", productTypeHandler.CreateSubtype)
+			r.Put("/product-subtypes/{id}", productTypeHandler.UpdateSubtype)
+			r.Delete("/product-subtypes/{id}", productTypeHandler.DeleteSubtype)
 		})
 	})
 

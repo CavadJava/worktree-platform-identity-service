@@ -1,6 +1,6 @@
 basePath: /api/v1
 definitions:
-  internal_handlers.productItemRequest:
+  handlers.productItemRequest:
     properties:
       discount_price:
         type: number
@@ -13,7 +13,7 @@ definitions:
       stock:
         type: integer
     type: object
-  internal_handlers.productRequest:
+  handlers.productRequest:
     properties:
       description:
         type: string
@@ -21,12 +21,26 @@ definitions:
         type: string
       price:
         type: number
+      product_type_id:
+        type: string
       shop_id:
         type: string
       stock:
         type: integer
     type: object
-  shop-product-service_internal_models.Product:
+  handlers.productSubtypeRequest:
+    properties:
+      name:
+        type: string
+    type: object
+  handlers.productTypeRequest:
+    properties:
+      name:
+        type: string
+      shop_id:
+        type: string
+    type: object
+  models.Product:
     properties:
       created_at:
         type: string
@@ -38,6 +52,8 @@ definitions:
         type: string
       price:
         type: number
+      product_type_id:
+        type: string
       shop_id:
         type: string
       stock:
@@ -45,7 +61,7 @@ definitions:
       updated_at:
         type: string
     type: object
-  shop-product-service_internal_models.ProductItem:
+  models.ProductItem:
     properties:
       created_at:
         type: string
@@ -66,6 +82,32 @@ definitions:
       updated_at:
         type: string
     type: object
+  models.ProductSubtype:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      product_type_id:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.ProductType:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      shop_id:
+        type: string
+      updated_at:
+        type: string
+    type: object
 info:
   contact: {}
   description: Mağaza məhsullarının CRUD idarəetməsi. Yaratma/yeniləmə/silmə üçün
@@ -83,7 +125,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/shop-product-service_internal_models.Product'
+              $ref: '#/definitions/models.Product'
             type: array
       security:
       - BearerAuth: []
@@ -132,7 +174,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shop-product-service_internal_models.ProductItem'
+            $ref: '#/definitions/models.ProductItem'
         "404":
           description: Not Found
           schema:
@@ -157,14 +199,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.productItemRequest'
+          $ref: '#/definitions/handlers.productItemRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shop-product-service_internal_models.ProductItem'
+            $ref: '#/definitions/models.ProductItem'
         "400":
           description: Bad Request
           schema:
@@ -188,6 +230,302 @@ paths:
       summary: Update a product item
       tags:
       - product-items
+  /product-subtypes/{id}:
+    delete:
+      description: review(3)+ səviyyəli mağaza əməkdaşı və ya administrator.
+      parameters:
+      - description: Product subtype ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a product subtype
+      tags:
+      - product-types
+    put:
+      consumes:
+      - application/json
+      description: add-product(2)+ səviyyəli mağaza əməkdaşı və ya administrator.
+      parameters:
+      - description: Product subtype ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Name payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.productSubtypeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ProductSubtype'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update a product subtype
+      tags:
+      - product-types
+  /product-types:
+    get:
+      parameters:
+      - description: Shop ID
+        in: query
+        name: shop_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.ProductType'
+            type: array
+      summary: List a shop's product types
+      tags:
+      - product-types
+    post:
+      consumes:
+      - application/json
+      description: Məsələn "Ölçü". add-product(2)+ səviyyəli mağaza əməkdaşı və ya
+        administrator əlavə edə bilər.
+      parameters:
+      - description: Product type payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.productTypeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.ProductType'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a product type (növ) for a shop
+      tags:
+      - product-types
+  /product-types/{id}:
+    delete:
+      description: review(3)+ səviyyəli mağaza əməkdaşı və ya administrator.
+      parameters:
+      - description: Product type ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a product type
+      tags:
+      - product-types
+    get:
+      parameters:
+      - description: Product type ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ProductType'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get a product type
+      tags:
+      - product-types
+    put:
+      consumes:
+      - application/json
+      description: add-product(2)+ səviyyəli mağaza əməkdaşı və ya administrator.
+      parameters:
+      - description: Product type ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Name payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.productSubtypeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ProductType'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update a product type
+      tags:
+      - product-types
+  /product-types/{type_id}/subtypes:
+    get:
+      parameters:
+      - description: Product type ID
+        in: path
+        name: type_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.ProductSubtype'
+            type: array
+      summary: List a product type's subtypes
+      tags:
+      - product-types
+    post:
+      consumes:
+      - application/json
+      description: Məsələn "Ölçü" növünə "En", "Uzunluq" alt növləri. add-product(2)+
+        səviyyəli mağaza əməkdaşı və ya administrator.
+      parameters:
+      - description: Product type ID
+        in: path
+        name: type_id
+        required: true
+        type: string
+      - description: Subtype payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.productSubtypeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.ProductSubtype'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Add a subtype (alt növ) to a product type
+      tags:
+      - product-types
   /products:
     get:
       parameters:
@@ -202,7 +540,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/shop-product-service_internal_models.Product'
+              $ref: '#/definitions/models.Product'
             type: array
       summary: List products
       tags:
@@ -218,14 +556,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.productRequest'
+          $ref: '#/definitions/handlers.productRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/shop-product-service_internal_models.Product'
+            $ref: '#/definitions/models.Product'
         "400":
           description: Bad Request
           schema:
@@ -291,7 +629,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shop-product-service_internal_models.Product'
+            $ref: '#/definitions/models.Product'
         "404":
           description: Not Found
           schema:
@@ -316,14 +654,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.productRequest'
+          $ref: '#/definitions/handlers.productRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shop-product-service_internal_models.Product'
+            $ref: '#/definitions/models.Product'
         "400":
           description: Bad Request
           schema:
@@ -399,7 +737,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/shop-product-service_internal_models.ProductItem'
+              $ref: '#/definitions/models.ProductItem'
             type: array
       summary: List a product's items/variants
       tags:
@@ -421,14 +759,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.productItemRequest'
+          $ref: '#/definitions/handlers.productItemRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/shop-product-service_internal_models.ProductItem'
+            $ref: '#/definitions/models.ProductItem'
         "400":
           description: Bad Request
           schema:

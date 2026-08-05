@@ -21,11 +21,12 @@ func NewProductHandler(svc *service.ProductService) *ProductHandler {
 }
 
 type productRequest struct {
-	ShopID      string  `json:"shop_id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price"`
-	Stock       int     `json:"stock"`
+	ShopID        string  `json:"shop_id"`
+	Name          string  `json:"name"`
+	Description   string  `json:"description"`
+	Price         float64 `json:"price"`
+	Stock         int     `json:"stock"`
+	ProductTypeID *string `json:"product_type_id,omitempty"`
 }
 
 // Create godoc
@@ -63,7 +64,7 @@ func (h *ProductHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Role:          identity.Role,
 		ShopID:        identity.ShopID,
 		ShopRoleLevel: identity.ShopRoleLevel,
-	}, req.ShopID, req.Name, req.Description, req.Price, req.Stock)
+	}, req.ShopID, req.Name, req.Description, req.Price, req.Stock, req.ProductTypeID)
 	if err != nil {
 		writeMutationError(w, err)
 		return
@@ -149,7 +150,7 @@ func (h *ProductHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Role:          identity.Role,
 		ShopID:        identity.ShopID,
 		ShopRoleLevel: identity.ShopRoleLevel,
-	}, id, req.Name, req.Description, req.Price, req.Stock)
+	}, id, req.Name, req.Description, req.Price, req.Stock, req.ProductTypeID)
 	if err != nil {
 		writeMutationError(w, err)
 		return
@@ -195,6 +196,10 @@ func writeMutationError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrProductNotFound):
 		writeError(w, http.StatusNotFound, "product not found")
+	case errors.Is(err, service.ErrProductTypeNotFound):
+		writeError(w, http.StatusBadRequest, "product type not found")
+	case errors.Is(err, service.ErrProductTypeMismatch):
+		writeError(w, http.StatusBadRequest, "product type does not belong to this shop")
 	case errors.Is(err, service.ErrForbidden):
 		writeError(w, http.StatusForbidden, "insufficient permission: must belong to this shop with at least the required hierarchical level, or be an administrator")
 	default:

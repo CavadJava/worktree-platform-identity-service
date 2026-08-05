@@ -35,7 +35,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/shop-product-service_internal_models.Product"
+                                "$ref": "#/definitions/models.Product"
                             }
                         }
                     }
@@ -64,7 +64,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shop-product-service_internal_models.ProductItem"
+                            "$ref": "#/definitions/models.ProductItem"
                         }
                     },
                     "404": {
@@ -109,7 +109,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.productItemRequest"
+                            "$ref": "#/definitions/handlers.productItemRequest"
                         }
                     }
                 ],
@@ -117,7 +117,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shop-product-service_internal_models.ProductItem"
+                            "$ref": "#/definitions/models.ProductItem"
                         }
                     },
                     "400": {
@@ -194,6 +194,463 @@ const docTemplate = `{
                 }
             }
         },
+        "/product-subtypes/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "add-product(2)+ səviyyəli mağaza əməkdaşı və ya administrator.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-types"
+                ],
+                "summary": "Update a product subtype",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product subtype ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Name payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.productSubtypeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ProductSubtype"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "review(3)+ səviyyəli mağaza əməkdaşı və ya administrator.",
+                "tags": [
+                    "product-types"
+                ],
+                "summary": "Delete a product subtype",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product subtype ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/product-types": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-types"
+                ],
+                "summary": "List a shop's product types",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Shop ID",
+                        "name": "shop_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.ProductType"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Məsələn \"Ölçü\". add-product(2)+ səviyyəli mağaza əməkdaşı və ya administrator əlavə edə bilər.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-types"
+                ],
+                "summary": "Create a product type (növ) for a shop",
+                "parameters": [
+                    {
+                        "description": "Product type payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.productTypeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.ProductType"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/product-types/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-types"
+                ],
+                "summary": "Get a product type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product type ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ProductType"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "add-product(2)+ səviyyəli mağaza əməkdaşı və ya administrator.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-types"
+                ],
+                "summary": "Update a product type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product type ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Name payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.productSubtypeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ProductType"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "review(3)+ səviyyəli mağaza əməkdaşı və ya administrator.",
+                "tags": [
+                    "product-types"
+                ],
+                "summary": "Delete a product type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product type ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/product-types/{type_id}/subtypes": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-types"
+                ],
+                "summary": "List a product type's subtypes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product type ID",
+                        "name": "type_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.ProductSubtype"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Məsələn \"Ölçü\" növünə \"En\", \"Uzunluq\" alt növləri. add-product(2)+ səviyyəli mağaza əməkdaşı və ya administrator.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-types"
+                ],
+                "summary": "Add a subtype (alt növ) to a product type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product type ID",
+                        "name": "type_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Subtype payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.productSubtypeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.ProductSubtype"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/products": {
             "get": {
                 "produces": [
@@ -217,7 +674,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/shop-product-service_internal_models.Product"
+                                "$ref": "#/definitions/models.Product"
                             }
                         }
                     }
@@ -247,7 +704,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.productRequest"
+                            "$ref": "#/definitions/handlers.productRequest"
                         }
                     }
                 ],
@@ -255,7 +712,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/shop-product-service_internal_models.Product"
+                            "$ref": "#/definitions/models.Product"
                         }
                     },
                     "400": {
@@ -310,7 +767,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shop-product-service_internal_models.Product"
+                            "$ref": "#/definitions/models.Product"
                         }
                     },
                     "404": {
@@ -355,7 +812,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.productRequest"
+                            "$ref": "#/definitions/handlers.productRequest"
                         }
                     }
                 ],
@@ -363,7 +820,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shop-product-service_internal_models.Product"
+                            "$ref": "#/definitions/models.Product"
                         }
                     },
                     "400": {
@@ -525,7 +982,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/shop-product-service_internal_models.ProductItem"
+                                "$ref": "#/definitions/models.ProductItem"
                             }
                         }
                     }
@@ -562,7 +1019,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.productItemRequest"
+                            "$ref": "#/definitions/handlers.productItemRequest"
                         }
                     }
                 ],
@@ -570,7 +1027,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/shop-product-service_internal_models.ProductItem"
+                            "$ref": "#/definitions/models.ProductItem"
                         }
                     },
                     "400": {
@@ -605,7 +1062,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "internal_handlers.productItemRequest": {
+        "handlers.productItemRequest": {
             "type": "object",
             "properties": {
                 "discount_price": {
@@ -625,7 +1082,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.productRequest": {
+        "handlers.productRequest": {
             "type": "object",
             "properties": {
                 "description": {
@@ -637,6 +1094,9 @@ const docTemplate = `{
                 "price": {
                     "type": "number"
                 },
+                "product_type_id": {
+                    "type": "string"
+                },
                 "shop_id": {
                     "type": "string"
                 },
@@ -645,7 +1105,26 @@ const docTemplate = `{
                 }
             }
         },
-        "shop-product-service_internal_models.Product": {
+        "handlers.productSubtypeRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.productTypeRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "shop_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Product": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -663,6 +1142,9 @@ const docTemplate = `{
                 "price": {
                     "type": "number"
                 },
+                "product_type_id": {
+                    "type": "string"
+                },
                 "shop_id": {
                     "type": "string"
                 },
@@ -674,7 +1156,7 @@ const docTemplate = `{
                 }
             }
         },
-        "shop-product-service_internal_models.ProductItem": {
+        "models.ProductItem": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -700,6 +1182,46 @@ const docTemplate = `{
                 },
                 "stock": {
                     "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ProductSubtype": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "product_type_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ProductType": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "shop_id": {
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"

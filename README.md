@@ -184,6 +184,29 @@ curl -X POST "http://localhost:8087/api/v1/products/$PRODUCT_ID/items" \
 curl "http://localhost:8087/api/v1/products/$PRODUCT_ID/items"
 ```
 
+### 8b. Məhsul növü/alt növü təyin etmək
+
+Mağaza sahibi öz kataloqu üçün taksonomiya qurur — məs. "Ölçü" növü, "En"/"Uzunluq" alt növləri:
+
+```bash
+TYPE_ID=$(curl -s -X POST http://localhost:8087/api/v1/product-types \
+  -H "Authorization: Bearer $APPLICANT_TOKEN" -H "Content-Type: application/json" \
+  -d '{"shop_id":"'"$SHOP_ID"'","name":"Ölçü"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['id'])")
+
+curl -X POST "http://localhost:8087/api/v1/product-types/$TYPE_ID/subtypes" \
+  -H "Authorization: Bearer $APPLICANT_TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"En"}'
+
+curl -X POST "http://localhost:8087/api/v1/product-types/$TYPE_ID/subtypes" \
+  -H "Authorization: Bearer $APPLICANT_TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"Uzunluq"}'
+
+# Məhsulu bu növə etiketləmək (product_type_id başqa mağazaya aiddirsə 400 qaytarır):
+curl -X POST http://localhost:8087/api/v1/products \
+  -H "Authorization: Bearer $APPLICANT_TOKEN" -H "Content-Type: application/json" \
+  -d '{"shop_id":"'"$SHOP_ID"'","name":"Bayraq","price":10,"stock":5,"product_type_id":"'"$TYPE_ID"'"}'
+```
+
 ### 9. Mağazanın öz sahibi (admin(4)) — sistem administratoru OLMADAN — əməkdaşa rol verir
 
 ```bash

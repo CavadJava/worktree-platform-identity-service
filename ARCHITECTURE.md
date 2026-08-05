@@ -50,7 +50,7 @@
 | authorization-service     | 8084 | JWT **doğrulama** (authorization), stateless          | yox                            | - |
 | shop-role-service         | 8085 | mağaza səviyyəsi (1-4) assign/revoke (yalnız admin)   | var, `users.shop_id`/`shop_role_level`-i paylaşır | authorization-service |
 | shop-service               | 8086 | mağaza CRUD + müraciət/təsdiq axını + abunəlik        | var, `shops`/`shop_applications`/`shop_subscriptions` sxemlərinin sahibi | authorization-service, notification-service |
-| shop-product-service       | 8087 | məhsul CRUD + variantlar (items) + favoritlər            | var, `products`/`product_items`/`product_favorites` sxemlərinin sahibi | authorization-service |
+| shop-product-service       | 8087 | məhsul CRUD + variantlar (items) + növ/alt-növ + favoritlər | var, `products`/`product_items`/`product_favorites`/`product_types`/`product_subtypes` sxemlərinin sahibi | authorization-service |
 | shop-chat-service           | 8088 | istifadəçi ↔ mağaza yazışması                          | var, `conversations`/`messages` sxemlərinin sahibi | authorization-service |
 | shop-order-service           | 8089 | sifariş yaratma/siyahı                                 | var, `orders`/`order_items` sxemlərinin sahibi + `users`/`shops`/`products`-ı oxuyur | authorization-service |
 | localization-service          | 8090 | çoxdilli mətn/xəta mesajları (az/en/ru)                | var, `translations` sxeminin sahibi | authorization-service |
@@ -103,6 +103,10 @@ Bu, "sistem 4 səviyyəni müəyyən edir, mağaza sahibi isə kimin hansı səv
 ## Məhsul variantları ([shop-product-service](shop-product-service))
 
 Bir `Product` (məs. "Bayraq") öz `price`/`stock`-una əlavə olaraq, hər biri **fərqli qiymət/stok/endirimə** sahib `ProductItem` variantlarına bölünə bilər (məs. "30x60 1 qat" vs "100x100 2 qat"). `is_discounted=true` olduqda `discount_price` məcburidir və `price`-dan kiçik olmalıdır. Yaratma/yeniləmə `add-product(2)`+, silmə `review(3)`+ tələb edir (məhsulun öz icazə modeli ilə eyni) — mağaza öz kataloqunu tam sərbəst idarə edir.
+
+## Məhsul növləri / alt növləri ([shop-product-service](shop-product-service))
+
+Mağaza sahibi öz mağazası üçün taksonomiya təyin edə bilər: `ProductType` (növ, məs. "Ölçü") mağaza-scoped-dir, `ProductSubtype` (alt növ, məs. "En", "Uzunluq") isə valideyn növə bağlıdır (`ON DELETE CASCADE`). `Product`-un opsional `product_type_id`-si onu bir növə etiketləyir — göstərilən növ mütləq məhsulun öz mağazasına aid olmalıdır (əks halda `400 bad_request`). Yaratma/yeniləmə `add-product(2)`+, silmə `review(3)`+ tələb edir — eyni icazə modeli (`ProductItem`/`Product` ilə eyni).
 
 ## İstifadəçi-tərəfli funksiyalar: favoritlər, abunəlik, yazışma
 

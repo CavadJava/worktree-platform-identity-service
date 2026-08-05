@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	ErrProductNotFound = repository.ErrProductNotFound
-	ErrForbidden       = errors.New("forbidden")
+	ErrProductNotFound     = repository.ErrProductNotFound
+	ErrForbidden           = errors.New("forbidden")
+	ErrProductTypeMismatch = errors.New("product type does not belong to this shop")
 )
 
 type Identity struct {
@@ -26,28 +27,47 @@ type Identity struct {
 }
 
 type ProductService struct {
-	repo *repository.ProductRepository
+	repo     *repository.ProductRepository
+	typeRepo *repository.ProductTypeRepository
 }
 
-func NewProductService(repo *repository.ProductRepository) *ProductService {
-	return &ProductService{repo: repo}
+func NewProductService(repo *repository.ProductRepository, typeRepo *repository.ProductTypeRepository) *ProductService {
+	return &ProductService{repo: repo, typeRepo: typeRepo}
 }
 
-func (s *ProductService) Create(ctx context.Context, identity Identity, shopID, name, description string, price float64, stock int) (*models.Product, error) {
+func (s *ProductService) validateProductType(ctx context.Context, shopID string, productTypeID *string) error {
+	if productTypeID == nil {
+		return nil
+	}
+	pt, err := s.typeRepo.FindByID(ctx, *productTypeID)
+	if err != nil {
+		return err
+	}
+	if pt.ShopID != shopID {
+		return ErrProductTypeMismatch
+	}
+	return nil
+}
+
+func (s *ProductService) Create(ctx context.Context, identity Identity, shopID, name, description string, price float64, stock int, productTypeID *string) (*models.Product, error) {
 	if !canManageShop(identity, shopID, roles.ShopLevelAddProduct) {
 		return nil, ErrForbidden
+	}
+	if err := s.validateProductType(ctx, shopID, productTypeID); err != nil {
+		return nil, err
 	}
 
 	now := time.Now().UTC()
 	p := &models.Product{
-		ID:          uuid.NewString(),
-		ShopID:      shopID,
-		Name:        strings.TrimSpace(name),
-		Description: description,
-		Price:       price,
-		Stock:       stock,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:            uuid.NewString(),
+		ShopID:        shopID,
+		Name:          strings.TrimSpace(name),
+		Description:   description,
+		Price:         price,
+		Stock:         stock,
+		ProductTypeID: productTypeID,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 
 	if err := s.repo.Create(ctx, p); err != nil {
@@ -64,7 +84,7 @@ func (s *ProductService) List(ctx context.Context, shopID string) ([]*models.Pro
 	return s.repo.List(ctx, shopID)
 }
 
-func (s *ProductService) Update(ctx context.Context, identity Identity, id, name, description string, price float64, stock int) (*models.Product, error) {
+func (s *ProductService) Update(ctx context.Context, identity Identity, id, name, description string, price float64, stock int, productTypeID *string) (*models.Product, error) {
 	product, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -72,7 +92,10 @@ func (s *ProductService) Update(ctx context.Context, identity Identity, id, name
 	if !canManageShop(identity, product.ShopID, roles.ShopLevelAddProduct) {
 		return nil, ErrForbidden
 	}
-	return s.repo.Update(ctx, id, strings.TrimSpace(name), description, price, stock)
+	if err := s.validateProductType(ctx, product.ShopID, productTypeID); err != nil {
+		return nil, err
+	}
+	return s.repo.Update(ctx, id, strings.TrimSpace(name), description, price, stock, productTypeID)
 }
 
 func (s *ProductService) Delete(ctx context.Context, identity Identity, id string) error {
