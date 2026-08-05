@@ -1,6 +1,6 @@
 # go-project-practices
 
-9 ayrı Go mikroservisi: qeydiyyat/login, profil, bildiriş, autorizasiya, mağaza rolları, mağaza CRUD + müraciət axını + abunəlik, məhsul CRUD + favoritlər, istifadəçi↔mağaza yazışması, sifarişlər. Arxitektura və servislərin bir-biri ilə əlaqəsi üçün bax [ARCHITECTURE.md](ARCHITECTURE.md).
+10 ayrı Go mikroservisi: qeydiyyat/login, profil, bildiriş, autorizasiya, mağaza rolları, mağaza CRUD + müraciət axını + abunəlik, məhsul CRUD + favoritlər, istifadəçi↔mağaza yazışması, sifarişlər, çoxdilli mətnlər. Arxitektura və servislərin bir-biri ilə əlaqəsi üçün bax [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Tələblər
 
@@ -10,7 +10,7 @@
 
 ## Servisləri işə salmaq
 
-Hər servisin öz `.env`-i var (repo-da hazır, lokal inkişaf üçün). 9 ayrı terminalda:
+Hər servisin öz `.env`-i var (repo-da hazır, lokal inkişaf üçün). 10 ayrı terminalda:
 
 ```bash
 cd notification-service   && go run ./cmd/api   # :8083
@@ -22,15 +22,20 @@ cd shop-service           && go run ./cmd/api   # :8086
 cd shop-product-service   && go run ./cmd/api   # :8087
 cd shop-chat-service      && go run ./cmd/api   # :8088
 cd shop-order-service     && go run ./cmd/api   # :8089
+cd localization-service   && go run ./cmd/api   # :8090
 ```
 
 Sıra fərq etmir, amma tam axın üçün hamısı ayaqda olmalıdır. Yoxlamaq:
 
 ```bash
-for p in 8081 8082 8083 8084 8085 8086 8087 8088 8089; do curl -s http://localhost:$p/health; echo " :$p"; done
+for p in 8081 8082 8083 8084 8085 8086 8087 8088 8089 8090; do curl -s http://localhost:$p/health; echo " :$p"; done
 ```
 
 Hər servisin Swagger UI-ı: `http://localhost:<port>/swagger/index.html`
+
+## CORS
+
+Bütün servislər default olaraq `http://localhost:5173`-dən (Vite dev server) gələn brauzer sorğularına icazə verir — `CORS_ALLOWED_ORIGINS` env dəyişəni ilə (vergüllə ayrılmış siyahı) hər servisdə fərdi tənzimlənə bilər. Frontend inkişafı zamanı əlavə CORS konfiqurasiyası tələb olunmur.
 
 ## Cavab formatı
 
@@ -294,6 +299,24 @@ curl -w "\nHTTP:%{http_code}\n" "http://localhost:8089/api/v1/orders/$ORDER_ID" 
 # → 403
 ```
 
+### 17. Çoxdilli mətnlər (localization-service)
+
+```bash
+# errors namespace-i, az dilində, bütün açarlar (key→value map):
+curl "http://localhost:8090/api/v1/translations/map?namespace=errors&locale=az"
+
+# Tək açar, fallback ilə (sorğulanan locale yoxdursa DEFAULT_LOCALE-a keçir):
+curl "http://localhost:8090/api/v1/translations/lookup?namespace=errors&key=forbidden&locale=ru"
+
+# Admin yeni tərcümə əlavə edir/yeniləyir (upsert):
+curl -X POST http://localhost:8090/api/v1/translations -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"namespace":"common","key":"welcome","locale":"az","value":"Xoş gəldiniz"}'
+
+# Mövcud locale-ların siyahısı:
+curl "http://localhost:8090/api/v1/locales"
+# → ["az","en","ru"]
+```
+
 ## Servislərin siyahısı
 
 | Servis | Qovluq | Port | README |
@@ -307,3 +330,4 @@ curl -w "\nHTTP:%{http_code}\n" "http://localhost:8089/api/v1/orders/$ORDER_ID" 
 | Məhsul CRUD + favoritlər | [shop-product-service](shop-product-service) | 8087 | [README](shop-product-service/README.md) |
 | İstifadəçi↔mağaza yazışması | [shop-chat-service](shop-chat-service) | 8088 | [README](shop-chat-service/README.md) |
 | Sifarişlər | [shop-order-service](shop-order-service) | 8089 | [README](shop-order-service/README.md) |
+| Çoxdilli mətnlər | [localization-service](localization-service) | 8090 | [README](localization-service/README.md) |

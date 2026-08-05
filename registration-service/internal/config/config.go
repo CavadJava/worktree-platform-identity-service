@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -22,6 +23,7 @@ type Config struct {
 	Port                 string
 	NotificationBaseURL  string
 	AuthorizationBaseURL string
+	CORSAllowedOrigins   []string
 }
 
 func Load() (*Config, error) {
@@ -44,6 +46,7 @@ func Load() (*Config, error) {
 		Port:                 getEnv("PORT", "8081"),
 		NotificationBaseURL:  getEnv("NOTIFICATION_SERVICE_URL", "http://localhost:8083"),
 		AuthorizationBaseURL: getEnv("AUTHORIZATION_SERVICE_URL", "http://localhost:8084"),
+		CORSAllowedOrigins:   strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
 	}
 
 	if cfg.JWTSecret == "" {

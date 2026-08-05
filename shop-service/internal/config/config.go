@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -17,7 +18,8 @@ type Config struct {
 	AuthorizationBaseURL string
 	NotificationBaseURL  string
 
-	Port string
+	Port               string
+	CORSAllowedOrigins []string
 }
 
 func Load() *Config {
@@ -33,6 +35,7 @@ func Load() *Config {
 		AuthorizationBaseURL: getEnv("AUTHORIZATION_SERVICE_URL", "http://localhost:8084"),
 		NotificationBaseURL:  getEnv("NOTIFICATION_SERVICE_URL", "http://localhost:8083"),
 		Port:                 getEnv("PORT", "8086"),
+		CORSAllowedOrigins:   strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
 	}
 }
 

@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -16,7 +17,8 @@ type Config struct {
 
 	AuthorizationBaseURL string
 
-	Port string
+	Port               string
+	CORSAllowedOrigins []string
 }
 
 func Load() *Config {
@@ -31,6 +33,7 @@ func Load() *Config {
 		DBSSLMode:            getEnv("DB_SSLMODE", "disable"),
 		AuthorizationBaseURL: getEnv("AUTHORIZATION_SERVICE_URL", "http://localhost:8084"),
 		Port:                 getEnv("PORT", "8087"),
+		CORSAllowedOrigins:   strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
 	}
 }
 

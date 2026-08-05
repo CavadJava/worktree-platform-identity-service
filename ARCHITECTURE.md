@@ -1,6 +1,6 @@
 # Arxitektura
 
-9 ayrı Go mikroservisi, ortaq bir PostgreSQL instansiyasına (`localhost:5433`) qoşulur.
+10 ayrı Go mikroservisi, ortaq bir PostgreSQL instansiyasına (`localhost:5433`) qoşulur.
 
 ```
  registration-service :8081 ──POST /notifications──▶ notification-service :8083
@@ -53,6 +53,7 @@
 | shop-product-service       | 8087 | məhsul CRUD + favoritlər                               | var, `products`/`product_favorites` sxemlərinin sahibi | authorization-service |
 | shop-chat-service           | 8088 | istifadəçi ↔ mağaza yazışması                          | var, `conversations`/`messages` sxemlərinin sahibi | authorization-service |
 | shop-order-service           | 8089 | sifariş yaratma/siyahı                                 | var, `orders`/`order_items` sxemlərinin sahibi + `users`/`shops`/`products`-ı oxuyur | authorization-service |
+| localization-service          | 8090 | çoxdilli mətn/xəta mesajları (az/en/ru)                | var, `translations` sxeminin sahibi | authorization-service |
 
 ## Niyə belə bölündü
 
@@ -115,9 +116,17 @@ Bunlar istənilən login olmuş istifadəçi üçün açıqdır (sahiblik/səviy
 - **Kim baxa bilər**: `GET /orders` — öz sifarişlərim (`user_id` ilə filtrlənib). `GET /orders/{id}` — sifarişi verən istifadəçi, mağazanın **add-product(2)+** səviyyəli əməkdaşı, ya da administrator. `GET /shops/{shop_id}/orders` — mağaza tərəfi, eyni səviyyə tələbi (sifarişlərə baxmaq add-product(2) səviyyəsinin — "mağazanın satış/kataloq idarəçiliyi" mənasının — təbii davamı sayılıb, sırf mesajlaşma olan `chat(1)`-dən fərqli olaraq).
 - shop-order-service `orders`/`order_items` cədvəllərinin sxem sahibidir, amma `users.user_seq`, `shops.shop_seq`, `products` (ad/qiymət/shop_id) üçün **birbaşa, read-only** eyni Postgres instansiyasından oxuyur — digər servislərin (məs. shop-role-service-in `users`-ı oxuması) artıq qurulmuş "ortaq DB, konkret sütun/cədvəl üçün nəzarətli cross-read" konvensiyasını izləyir, əlavə HTTP round-trip-lər olmadan.
 
+## Çoxdilli mətnlər ([localization-service](localization-service), :8090)
+
+`translations (namespace, key, locale, value)` — unikal `(namespace, key, locale)`. İlk açılışda bütün servislərin response-envelope-unda artıq istifadə olunan error code-ları (`bad_request`, `unauthorized`, `forbidden`, `not_found`, `conflict`, `internal_error`, `service_unavailable`, `error`) `errors` namespace-i altında az/en/ru dillərində avtomatik yüklənir (idempotent seed, admin redaktələrini əzmir) — bu, `error.code`-u alıb lokallaşdırılmış mesaj göstərmək istəyən istənilən client üçün hazır inteqrasiya nöqtəsidir. Oxumaq (`list`/`map`/`lookup`/`locales`) public-dir; yazmaq yalnız administrator üçündür. `lookup` sorğulanan locale tapılmasa `DEFAULT_LOCALE`-a (default `az`) fallback edir.
+
+## CORS
+
+Bütün 10 servis `github.com/go-chi/cors` ilə brauzer-mənşəli sorğulara icazə verir — default olaraq `http://localhost:5173` (Vite dev server) `CORS_ALLOWED_ORIGINS` env dəyişəni ilə tənzimlənir (vergüllə ayrılmış siyahı). `Authorization`, `Content-Type` başlıqlarına və `GET/POST/PUT/DELETE/OPTIONS` metodlarına icazə verilir.
+
 ## Cavab formatı (uğur/xəta)
 
-Bütün 9 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarır:
+Bütün 10 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarır:
 
 ```json
 // uğurlu:
@@ -134,7 +143,7 @@ Bütün 9 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarı
 Hər servisin öz `.env`-i var (bax hər qovluqdakı `.env.example`). Sırası fərq etmir, amma tam funksionallıq üçün hamısı ayaqda olmalıdır. Tam addım-addım təlimat və nümunə API çağırışları üçün bax [README.md](README.md).
 
 ```bash
-# 9 ayrı terminalda:
+# 10 ayrı terminalda:
 cd notification-service   && go run ./cmd/api   # :8083
 cd authorization-service  && go run ./cmd/api   # :8084
 cd registration-service   && go run ./cmd/api   # :8081
@@ -144,6 +153,7 @@ cd shop-service           && go run ./cmd/api   # :8086
 cd shop-product-service   && go run ./cmd/api   # :8087
 cd shop-chat-service      && go run ./cmd/api   # :8088
 cd shop-order-service     && go run ./cmd/api   # :8089
+cd localization-service   && go run ./cmd/api   # :8090
 ```
 
 Hər servisin öz Swagger UI-ı var: `http://localhost:<port>/swagger/index.html`
