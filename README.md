@@ -167,6 +167,23 @@ curl -X POST http://localhost:8087/api/v1/products \
   -d '{"shop_id":"'"$SHOP_ID"'","name":"Divan","description":"3 nəfərlik","price":899.99,"stock":5}'
 ```
 
+### 8a. Məhsula variantlar (itemlər) əlavə etmək
+
+Hər variantın öz qiyməti/stoku/endirimi var — məs. "Bayraq" məhsuluna fərqli ölçü/qat variantları:
+
+```bash
+curl -X POST "http://localhost:8087/api/v1/products/$PRODUCT_ID/items" \
+  -H "Authorization: Bearer $APPLICANT_TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"30x60 1 qat","price":15,"stock":200,"is_discounted":false}'
+
+curl -X POST "http://localhost:8087/api/v1/products/$PRODUCT_ID/items" \
+  -H "Authorization: Bearer $APPLICANT_TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"100x100 2 qat","price":45,"stock":50,"is_discounted":true,"discount_price":35}'
+# is_discounted=true olduqda discount_price məcburidir və price-dan kiçik olmalıdır — əks halda 400
+
+curl "http://localhost:8087/api/v1/products/$PRODUCT_ID/items"
+```
+
 ### 9. Mağazanın öz sahibi (admin(4)) — sistem administratoru OLMADAN — əməkdaşa rol verir
 
 ```bash

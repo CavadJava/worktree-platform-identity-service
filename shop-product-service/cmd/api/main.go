@@ -41,11 +41,14 @@ func main() {
 
 	productRepo := repository.NewProductRepository(db)
 	favoriteRepo := repository.NewFavoriteRepository(db)
+	itemRepo := repository.NewProductItemRepository(db)
 	authClient := client.NewAuthorizationClient(cfg.AuthorizationBaseURL)
 	productService := service.NewProductService(productRepo)
 	favoriteService := service.NewFavoriteService(favoriteRepo, productRepo)
+	itemService := service.NewProductItemService(itemRepo, productRepo)
 	productHandler := handlers.NewProductHandler(productService)
 	favoriteHandler := handlers.NewFavoriteHandler(favoriteService)
+	itemHandler := handlers.NewProductItemHandler(itemService)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -67,6 +70,8 @@ func main() {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/products", productHandler.List)
 		r.Get("/products/{id}", productHandler.Get)
+		r.Get("/products/{product_id}/items", itemHandler.List)
+		r.Get("/product-items/{id}", itemHandler.Get)
 
 		r.Group(func(r chi.Router) {
 			r.Use(appmiddleware.RequireAuth(authClient))
@@ -77,6 +82,10 @@ func main() {
 			r.Post("/products/{id}/favorite", favoriteHandler.Add)
 			r.Delete("/products/{id}/favorite", favoriteHandler.Remove)
 			r.Get("/favorites", favoriteHandler.List)
+
+			r.Post("/products/{product_id}/items", itemHandler.Create)
+			r.Put("/product-items/{id}", itemHandler.Update)
+			r.Delete("/product-items/{id}", itemHandler.Delete)
 		})
 	})
 
