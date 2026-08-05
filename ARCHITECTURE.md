@@ -46,7 +46,7 @@
 |--------------------------|------|-----------------------------------------------------|------------------------------|-------------|
 | registration-service     | 8081 | qeydiyyat, login, JWT **yaratma** (authentication)   | var, `users` sxeminin sahibi | notification-service |
 | user-service              | 8082 | profil GET/PUT                                        | var, `users`-ı paylaşır       | authorization-service |
-| notification-service      | 8083 | bildiriş (mock, log-only)                             | yox                            | - |
+| notification-service      | 8083 | bildiriş: mock göndərmə + istifadəçi inbox-u          | var, `notifications` sxeminin sahibi | authorization-service |
 | authorization-service     | 8084 | JWT **doğrulama** (authorization), stateless          | yox                            | - |
 | shop-role-service         | 8085 | mağaza səviyyəsi (1-4) assign/revoke (yalnız admin)   | var, `users.shop_id`/`shop_role_level`-i paylaşır | authorization-service |
 | shop-service               | 8086 | mağaza CRUD + müraciət/təsdiq axını + abunəlik        | var, `shops`/`shop_applications`/`shop_subscriptions` sxemlərinin sahibi | authorization-service, notification-service |
@@ -61,7 +61,7 @@
 
 - **Authentication vs authorization ayrıdır**: registration-service token yaradır (kimsən), authorization-service token doğrulayır (icazən varmı). `JWT_SECRET` yalnız bu ikisində var, digərlərində yoxdur.
 - **Auth tələb edən servislər token doğrulamır özləri** — hər qorunan sorğuda authorization-service-ə HTTP ilə müraciət edir (`internal/client/authorization_client.go` hər servisdə eyni pattern). Bu, servisləri kriptoqrafik sirdən tam təcrid edir.
-- **notification-service mock-dur** — real email/SMS provideri yoxdur, sadəcə konsola loglayır. registration-service bu çağırışın uğursuz olmasını qeydiyyatı bloklamaq üçün istifadə etmir.
+- **notification-service göndərməni mock edir, inbox-u isə real saxlayır** — real email/SMS provideri yoxdur (konsola loglanır), amma `user_id` ilə gələn bildirişlər `notifications` cədvəlində saxlanılır və istifadəçi öz inbox-unu oxuya bilir. registration-service bu çağırışın uğursuz olmasını qeydiyyatı bloklamaq üçün istifadə etmir; shop-product-service də yeni məhsul bildirişlərini goroutine-də best-effort göndərir — bildiriş uğursuz olsa məhsul yaradılması pozulmur.
 - **Ortaq DB, ayrı sxem sahibliyi**: registration-service, user-service, shop-role-service eyni `users` cədvəlinə baxır, amma yalnız registration-service migrasiya aparır. shop-service tətbiq təsdiqi zamanı da bu cədvəlin iki sütununa (`shop_id`, `shop_role_level`) yazır — mağaza yaradılanda müraciət sahibini avtomatik o mağazanın admin(4) səviyyəsinə təyin etmək üçün. shop-service və shop-product-service isə öz `shops`/`shop_applications`/`products` cədvəllərinin tam sahibidir.
 - **Mağaza icazəsi tamamilə JWT-dən qərarlaşdırılır**: istifadəçi bir mağazaya aiddirsə, bunu `shop_id`+`shop_role_level` claim-ləri daşıyır. shop-product-service artıq shop-service-ə cross-service sorğu göndərmir (əvvəlki versiyada belə idi) — sadəcə JWT-dəki `shop_id`-ni əməliyyatın hədəf mağazası ilə müqayisə edir. Bu, sistemi həm sadələşdirir, həm sürətləndirir.
 
@@ -119,7 +119,7 @@ Sistem-səviyyəli gəzinti kataloqu — `categories` (məs. "Women's Fashion") 
 Bunlar istənilən login olmuş istifadəçi üçün açıqdır (sahiblik/səviyyə tələb olunmur — sadəcə auth):
 
 - **Məhsul favoritləri** ([shop-product-service](shop-product-service)): `POST/DELETE /products/{id}/favorite`, `GET /favorites` — istifadəçinin özü üçün. `product_favorites (user_id, product_id)` composite PK, `ON CONFLICT DO NOTHING` ilə idempotent.
-- **Mağaza abunəliyi** ([shop-service](shop-service)): `POST/DELETE /shops/{id}/subscribe`, `GET /subscriptions`. `shop_subscriptions (user_id, shop_id)` eyni pattern.
+- **Mağaza abunəliyi** ([shop-service](shop-service)): `POST/DELETE /shops/{id}/subscribe`, `GET /subscriptions`. `shop_subscriptions (user_id, shop_id)` eyni pattern. Abunəliyin funksional qarşılığı: mağaza **yeni məhsul əlavə edəndə** shop-product-service bütün abunəçilərə notification-service vasitəsilə bildiriş göndərir (`type=new_product`, inbox-da saxlanılır) — shop_subscriptions-ı shared-DB konvensiyası ilə birbaşa oxuyur.
 - **İstifadəçi ↔ mağaza yazışması** ([shop-chat-service](shop-chat-service), :8088): hər `(shop_id, user_id)` cütü üçün **bir** söhbət mövcuddur (`UNIQUE (shop_id, user_id)`) — `POST /conversations {shop_id}` mövcud olanı tapıb qaytarır, yoxdursa yaradır. Mesaj göndərən tərəf avtomatik müəyyən olunur: `caller.UserID == conversation.UserID` olsa `sender_role=user`, əks halda `sender_role=shop`. Kim yaza/oxuya bilər: söhbətin sahibi olan müştəri, mağazanın **chat(1)+** səviyyəli əməkdaşı, və ya sistem administratoru — bu, `chat` (1) səviyyəsinin ilk konkret istifadəsidir (əvvəllər yalnız hierarxiyada nəzərdə tutulmuşdu, funksional qarşılığı yox idi).
 
 ## Unikal nömrələr və sifarişlər ([shop-order-service](shop-order-service), :8089)

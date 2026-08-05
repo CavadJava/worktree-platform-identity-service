@@ -16,8 +16,50 @@ const docTemplate = `{
     "basePath": "{{.BasePath}}",
     "paths": {
         "/notifications": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "List the current user's notifications (inbox)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Default 50, max 200",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Notification"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
             "post": {
-                "description": "Bildirişi real olaraq göndərmir — konsola loglayır (mock). Real provider (SMTP/SMS) əlavə etmək üçün buraya inteqrasiya edilə bilər.",
+                "description": "Real provayder yoxdur — konsola loglanır (mock). ` + "`" + `user_id` + "`" + ` verilsə bildiriş həmçinin istifadəçinin inbox-unda saxlanılır və GET /notifications ilə oxuna bilir.",
                 "consumes": [
                     "application/json"
                 ],
@@ -27,7 +69,7 @@ const docTemplate = `{
                 "tags": [
                     "notifications"
                 ],
-                "summary": "Send a notification (mocked)",
+                "summary": "Send a notification",
                 "parameters": [
                     {
                         "description": "Notification payload",
@@ -35,7 +77,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.sendNotificationRequest"
+                            "$ref": "#/definitions/handlers.sendNotificationRequest"
                         }
                     }
                 ],
@@ -43,7 +85,7 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.sendNotificationResponse"
+                            "$ref": "#/definitions/handlers.sendNotificationResponse"
                         }
                     },
                     "400": {
@@ -57,10 +99,118 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/notifications/read-all": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Mark all of the current user's notifications as read",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/unread-count": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Count the current user's unread notifications",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/{id}/read": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Mark one of the current user's notifications as read",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Notification ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
-        "internal_handlers.sendNotificationRequest": {
+        "handlers.sendNotificationRequest": {
             "type": "object",
             "properties": {
                 "full_name": {
@@ -74,13 +224,43 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string"
+                },
+                "user_id": {
+                    "description": "verilsə bildiriş inbox-da saxlanılır",
+                    "type": "string"
                 }
             }
         },
-        "internal_handlers.sendNotificationResponse": {
+        "handlers.sendNotificationResponse": {
             "type": "object",
             "properties": {
                 "status": {
+                    "type": "string"
+                },
+                "stored": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "models.Notification": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_read": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "user_id": {
                     "type": "string"
                 }
             }

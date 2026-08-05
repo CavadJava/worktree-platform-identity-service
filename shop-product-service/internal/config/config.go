@@ -16,6 +16,7 @@ type Config struct {
 	DBSSLMode  string
 
 	AuthorizationBaseURL string
+	NotificationBaseURL  string
 
 	Port               string
 	CORSAllowedOrigins []string
@@ -33,6 +34,7 @@ func Load() *Config {
 		DBName:               getEnv("DB_NAME", "postgres"),
 		DBSSLMode:            getEnv("DB_SSLMODE", "disable"),
 		AuthorizationBaseURL: getEnv("AUTHORIZATION_SERVICE_URL", "http://localhost:8084"),
+		NotificationBaseURL:  getEnv("NOTIFICATION_SERVICE_URL", "http://localhost:8083"),
 		Port:                 getEnv("PORT", "8087"),
 		CORSAllowedOrigins:   strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
 		LogServiceURL:        getEnv("LOG_SERVICE_URL", "http://localhost:8091"),

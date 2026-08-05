@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -26,13 +28,53 @@ type Identity struct {
 	ShopRoleLevel int
 }
 
-type ProductService struct {
-	repo     *repository.ProductRepository
-	typeRepo *repository.ProductTypeRepository
+// Notifier sends a notification to a single user — satisfied by
+// client.NotificationClient. Kept as an interface so the service layer
+// stays decoupled from the HTTP client.
+type Notifier interface {
+	Send(notificationType, userID, message string) error
 }
 
-func NewProductService(repo *repository.ProductRepository, typeRepo *repository.ProductTypeRepository) *ProductService {
-	return &ProductService{repo: repo, typeRepo: typeRepo}
+type ProductService struct {
+	repo        *repository.ProductRepository
+	typeRepo    *repository.ProductTypeRepository
+	subscribers *repository.SubscriberRepository
+	notifier    Notifier
+}
+
+func NewProductService(repo *repository.ProductRepository, typeRepo *repository.ProductTypeRepository, subscribers *repository.SubscriberRepository, notifier Notifier) *ProductService {
+	return &ProductService{repo: repo, typeRepo: typeRepo, subscribers: subscribers, notifier: notifier}
+}
+
+// notifySubscribers fans a "new product" notification out to everyone
+// subscribed to the shop. Runs in its own goroutine with a fresh context
+// (the request context is gone by then) and is strictly best-effort:
+// failures are logged, never surfaced — a missed notification must not
+// affect the product that was already created.
+func (s *ProductService) notifySubscribers(shopID, productName string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	userIDs, err := s.subscribers.ListUserIDsByShop(ctx, shopID)
+	if err != nil {
+		log.Printf("notify subscribers: list failed for shop %s: %v", shopID, err)
+		return
+	}
+	if len(userIDs) == 0 {
+		return
+	}
+
+	shopName, err := s.subscribers.ShopName(ctx, shopID)
+	if err != nil {
+		shopName = "Abunə olduğunuz mağaza"
+	}
+	message := fmt.Sprintf("%s yeni məhsul əlavə etdi: %s", shopName, productName)
+
+	for _, userID := range userIDs {
+		if err := s.notifier.Send("new_product", userID, message); err != nil {
+			log.Printf("notify subscribers: send to %s failed: %v", userID, err)
+		}
+	}
 }
 
 func (s *ProductService) validateProductType(ctx context.Context, shopID string, productTypeID *string) error {
@@ -73,6 +115,9 @@ func (s *ProductService) Create(ctx context.Context, identity Identity, shopID, 
 	if err := s.repo.Create(ctx, p); err != nil {
 		return nil, err
 	}
+
+	go s.notifySubscribers(p.ShopID, p.Name)
+
 	return p, nil
 }
 

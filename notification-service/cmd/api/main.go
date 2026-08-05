@@ -9,10 +9,14 @@ import (
 	"github.com/go-chi/cors"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
+	"notification-service/internal/client"
 	appconfig "notification-service/internal/config"
+	"notification-service/internal/database"
 	_ "notification-service/internal/docs"
 	"notification-service/internal/handlers"
 	"notification-service/internal/logclient"
+	appmiddleware "notification-service/internal/middleware"
+	"notification-service/internal/repository"
 )
 
 // @title           Notification Service API
@@ -22,7 +26,19 @@ import (
 func main() {
 	cfg := appconfig.Load()
 
-	notificationHandler := handlers.NewNotificationHandler()
+	db, err := database.Connect(cfg)
+	if err != nil {
+		log.Fatalf("database error: %v", err)
+	}
+	defer db.Close()
+
+	if err := database.Migrate(db); err != nil {
+		log.Fatalf("migration error: %v", err)
+	}
+
+	notificationRepo := repository.NewNotificationRepository(db)
+	authClient := client.NewAuthorizationClient(cfg.AuthorizationBaseURL)
+	notificationHandler := handlers.NewNotificationHandler(notificationRepo)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -44,6 +60,14 @@ func main() {
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/notifications", notificationHandler.Send)
+
+		r.Group(func(r chi.Router) {
+			r.Use(appmiddleware.Auth(authClient))
+			r.Get("/notifications", notificationHandler.List)
+			r.Get("/notifications/unread-count", notificationHandler.UnreadCount)
+			r.Put("/notifications/{id}/read", notificationHandler.MarkRead)
+			r.Put("/notifications/read-all", notificationHandler.MarkAllRead)
+		})
 	})
 
 	log.Printf("notification-service listening on :%s", cfg.Port)
