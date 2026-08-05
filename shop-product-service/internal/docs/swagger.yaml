@@ -15,9 +15,19 @@ definitions:
     type: object
   handlers.productRequest:
     properties:
+      brand:
+        description: |-
+          Optional "deep" attributes — absent/omitted means "not set", which
+          the response reports back via has_brand/has_material/has_weight/
+          has_origin/has_warranty (see models.Product.ComputeFlags).
+        type: string
       description:
         type: string
+      material:
+        type: string
       name:
+        type: string
+      origin_country:
         type: string
       price:
         type: number
@@ -27,6 +37,10 @@ definitions:
         type: string
       stock:
         type: integer
+      warranty_months:
+        type: integer
+      weight_kg:
+        type: number
     type: object
   handlers.productSubtypeRequest:
     properties:
@@ -42,13 +56,29 @@ definitions:
     type: object
   models.Product:
     properties:
+      brand:
+        type: string
       created_at:
         type: string
       description:
         type: string
+      has_brand:
+        type: boolean
+      has_material:
+        type: boolean
+      has_origin:
+        type: boolean
+      has_warranty:
+        type: boolean
+      has_weight:
+        type: boolean
       id:
         type: string
+      material:
+        type: string
       name:
+        type: string
+      origin_country:
         type: string
       price:
         type: number
@@ -60,6 +90,10 @@ definitions:
         type: integer
       updated_at:
         type: string
+      warranty_months:
+        type: integer
+      weight_kg:
+        type: number
     type: object
   models.ProductItem:
     properties:

@@ -46,6 +46,11 @@ func Migrate(db *sql.DB) error {
 		);
 		CREATE INDEX IF NOT EXISTS idx_products_shop_id ON products (shop_id);
 		ALTER TABLE products ADD COLUMN IF NOT EXISTS product_type_id UUID;
+		ALTER TABLE products ADD COLUMN IF NOT EXISTS brand VARCHAR(255);
+		ALTER TABLE products ADD COLUMN IF NOT EXISTS material VARCHAR(255);
+		ALTER TABLE products ADD COLUMN IF NOT EXISTS weight_kg NUMERIC(10,3);
+		ALTER TABLE products ADD COLUMN IF NOT EXISTS origin_country VARCHAR(100);
+		ALTER TABLE products ADD COLUMN IF NOT EXISTS warranty_months INTEGER;
 
 		CREATE TABLE IF NOT EXISTS product_types (
 			id UUID PRIMARY KEY,

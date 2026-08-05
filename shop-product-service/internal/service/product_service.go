@@ -19,6 +19,8 @@ var (
 	ErrProductNotFound     = repository.ErrProductNotFound
 	ErrForbidden           = errors.New("forbidden")
 	ErrProductTypeMismatch = errors.New("product type does not belong to this shop")
+	ErrInvalidWeight       = errors.New("weight_kg must be greater than 0")
+	ErrInvalidWarranty     = errors.New("warranty_months must be 0 or greater")
 )
 
 type Identity struct {
@@ -91,26 +93,48 @@ func (s *ProductService) validateProductType(ctx context.Context, shopID string,
 	return nil
 }
 
-func (s *ProductService) Create(ctx context.Context, identity Identity, shopID, name, description string, price float64, stock int, productTypeID *string) (*models.Product, error) {
+// validateDetails applies light sanity checks to the optional "deep"
+// attributes — a value is either absent (nil, no check) or must make sense
+// (a weight can't be zero/negative, a warranty can't be negative).
+func validateDetails(details models.ProductDetails) error {
+	if details.WeightKg != nil && *details.WeightKg <= 0 {
+		return ErrInvalidWeight
+	}
+	if details.WarrantyMonths != nil && *details.WarrantyMonths < 0 {
+		return ErrInvalidWarranty
+	}
+	return nil
+}
+
+func (s *ProductService) Create(ctx context.Context, identity Identity, shopID, name, description string, price float64, stock int, productTypeID *string, details models.ProductDetails) (*models.Product, error) {
 	if !canManageShop(identity, shopID, roles.ShopLevelAddProduct) {
 		return nil, ErrForbidden
 	}
 	if err := s.validateProductType(ctx, shopID, productTypeID); err != nil {
 		return nil, err
 	}
+	if err := validateDetails(details); err != nil {
+		return nil, err
+	}
 
 	now := time.Now().UTC()
 	p := &models.Product{
-		ID:            uuid.NewString(),
-		ShopID:        shopID,
-		Name:          strings.TrimSpace(name),
-		Description:   description,
-		Price:         price,
-		Stock:         stock,
-		ProductTypeID: productTypeID,
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		ID:             uuid.NewString(),
+		ShopID:         shopID,
+		Name:           strings.TrimSpace(name),
+		Description:    description,
+		Price:          price,
+		Stock:          stock,
+		ProductTypeID:  productTypeID,
+		Brand:          details.Brand,
+		Material:       details.Material,
+		WeightKg:       details.WeightKg,
+		OriginCountry:  details.OriginCountry,
+		WarrantyMonths: details.WarrantyMonths,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
+	p.ComputeFlags()
 
 	if err := s.repo.Create(ctx, p); err != nil {
 		return nil, err
@@ -129,7 +153,7 @@ func (s *ProductService) List(ctx context.Context, shopID string) ([]*models.Pro
 	return s.repo.List(ctx, shopID)
 }
 
-func (s *ProductService) Update(ctx context.Context, identity Identity, id, name, description string, price float64, stock int, productTypeID *string) (*models.Product, error) {
+func (s *ProductService) Update(ctx context.Context, identity Identity, id, name, description string, price float64, stock int, productTypeID *string, details models.ProductDetails) (*models.Product, error) {
 	product, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -140,7 +164,10 @@ func (s *ProductService) Update(ctx context.Context, identity Identity, id, name
 	if err := s.validateProductType(ctx, product.ShopID, productTypeID); err != nil {
 		return nil, err
 	}
-	return s.repo.Update(ctx, id, strings.TrimSpace(name), description, price, stock, productTypeID)
+	if err := validateDetails(details); err != nil {
+		return nil, err
+	}
+	return s.repo.Update(ctx, id, strings.TrimSpace(name), description, price, stock, productTypeID, details)
 }
 
 func (s *ProductService) Delete(ctx context.Context, identity Identity, id string) error {

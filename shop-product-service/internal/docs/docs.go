@@ -1085,10 +1085,20 @@ const docTemplate = `{
         "handlers.productRequest": {
             "type": "object",
             "properties": {
+                "brand": {
+                    "description": "Optional \"deep\" attributes — absent/omitted means \"not set\", which\nthe response reports back via has_brand/has_material/has_weight/\nhas_origin/has_warranty (see models.Product.ComputeFlags).",
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
+                "material": {
+                    "type": "string"
+                },
                 "name": {
+                    "type": "string"
+                },
+                "origin_country": {
                     "type": "string"
                 },
                 "price": {
@@ -1102,6 +1112,12 @@ const docTemplate = `{
                 },
                 "stock": {
                     "type": "integer"
+                },
+                "warranty_months": {
+                    "type": "integer"
+                },
+                "weight_kg": {
+                    "type": "number"
                 }
             }
         },
@@ -1127,16 +1143,40 @@ const docTemplate = `{
         "models.Product": {
             "type": "object",
             "properties": {
+                "brand": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
                 "description": {
                     "type": "string"
                 },
+                "has_brand": {
+                    "type": "boolean"
+                },
+                "has_material": {
+                    "type": "boolean"
+                },
+                "has_origin": {
+                    "type": "boolean"
+                },
+                "has_warranty": {
+                    "type": "boolean"
+                },
+                "has_weight": {
+                    "type": "boolean"
+                },
                 "id": {
                     "type": "string"
                 },
+                "material": {
+                    "type": "string"
+                },
                 "name": {
+                    "type": "string"
+                },
+                "origin_country": {
                     "type": "string"
                 },
                 "price": {
@@ -1153,6 +1193,12 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                },
+                "warranty_months": {
+                    "type": "integer"
+                },
+                "weight_kg": {
+                    "type": "number"
                 }
             }
         },

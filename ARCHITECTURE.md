@@ -111,6 +111,10 @@ Bir `Product` (məs. "Bayraq") öz `price`/`stock`-una əlavə olaraq, hər biri
 
 Mağaza sahibi öz mağazası üçün taksonomiya təyin edə bilər: `ProductType` (növ, məs. "Ölçü") mağaza-scoped-dir, `ProductSubtype` (alt növ, məs. "En", "Uzunluq") isə valideyn növə bağlıdır (`ON DELETE CASCADE`). `Product`-un opsional `product_type_id`-si onu bir növə etiketləyir — göstərilən növ mütləq məhsulun öz mağazasına aid olmalıdır (əks halda `400 bad_request`). Yaratma/yeniləmə `add-product(2)`+, silmə `review(3)`+ tələb edir — eyni icazə modeli (`ProductItem`/`Product` ilə eyni).
 
+## Məhsulun dərin sahələri ([shop-product-service](shop-product-service))
+
+`Product` beş opsional atribut daşıya bilər: `brand`, `material`, `weight_kg`, `origin_country`, `warranty_months`. Hər birinin yanında cavabda avtomatik bir `has_*` bool sahəsi gəlir (`has_brand`, `has_material`, `has_weight`, `has_origin`, `has_warranty`) — dəyər varsa `true`, yoxdursa `false`. Bu bayraqlar sütun kimi saxlanılmır, `Product.ComputeFlags()` ilə hər `Scan`/`Create`/`Update`-dən sonra əsas sahədən yenidən hesablanır ki, öz mənbəyindən heç vaxt "yayına" bilməsin.
+
 ## Kataloq: kateqoriyalar / alt-kateqoriyalar ([shop-category-service](shop-category-service), :8092)
 
 Sistem-səviyyəli gəzinti kataloqu — `categories` (məs. "Women's Fashion") və `subcategories` (məs. "Women's Dresses", `ON DELETE CASCADE`). Yalnız administrator idarə edir, oxumaq public-dir. ID-lər oxunaqlı slug-lardır (`women-fashion`) — startup-da 10 kateqoriya + 57 alt-kateqoriyalıq default kataloq idempotent seed edilir (admin redaktələri əzilmir), `id` verilmədən yaradılanda addan avtomatik slug düzəldilir. Mağaza-scoped `product_types`/`product_subtypes`-dən fərqlidir: o, hər mağazanın öz daxili taksonomiyasıdır, bu isə bütün marketplace-in kataloq ağacıdır.

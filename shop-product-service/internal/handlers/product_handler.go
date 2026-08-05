@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"shop-product-service/internal/middleware"
-	_ "shop-product-service/internal/models" // referenced by swag annotations
+	"shop-product-service/internal/models"
 	"shop-product-service/internal/service"
 )
 
@@ -27,6 +27,24 @@ type productRequest struct {
 	Price         float64 `json:"price"`
 	Stock         int     `json:"stock"`
 	ProductTypeID *string `json:"product_type_id,omitempty"`
+	// Optional "deep" attributes — absent/omitted means "not set", which
+	// the response reports back via has_brand/has_material/has_weight/
+	// has_origin/has_warranty (see models.Product.ComputeFlags).
+	Brand          *string  `json:"brand,omitempty"`
+	Material       *string  `json:"material,omitempty"`
+	WeightKg       *float64 `json:"weight_kg,omitempty"`
+	OriginCountry  *string  `json:"origin_country,omitempty"`
+	WarrantyMonths *int     `json:"warranty_months,omitempty"`
+}
+
+func (req productRequest) details() models.ProductDetails {
+	return models.ProductDetails{
+		Brand:          req.Brand,
+		Material:       req.Material,
+		WeightKg:       req.WeightKg,
+		OriginCountry:  req.OriginCountry,
+		WarrantyMonths: req.WarrantyMonths,
+	}
 }
 
 // Create godoc
@@ -64,7 +82,7 @@ func (h *ProductHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Role:          identity.Role,
 		ShopID:        identity.ShopID,
 		ShopRoleLevel: identity.ShopRoleLevel,
-	}, req.ShopID, req.Name, req.Description, req.Price, req.Stock, req.ProductTypeID)
+	}, req.ShopID, req.Name, req.Description, req.Price, req.Stock, req.ProductTypeID, req.details())
 	if err != nil {
 		writeMutationError(w, err)
 		return
@@ -150,7 +168,7 @@ func (h *ProductHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Role:          identity.Role,
 		ShopID:        identity.ShopID,
 		ShopRoleLevel: identity.ShopRoleLevel,
-	}, id, req.Name, req.Description, req.Price, req.Stock, req.ProductTypeID)
+	}, id, req.Name, req.Description, req.Price, req.Stock, req.ProductTypeID, req.details())
 	if err != nil {
 		writeMutationError(w, err)
 		return
@@ -200,6 +218,10 @@ func writeMutationError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "product type not found")
 	case errors.Is(err, service.ErrProductTypeMismatch):
 		writeError(w, http.StatusBadRequest, "product type does not belong to this shop")
+	case errors.Is(err, service.ErrInvalidWeight):
+		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, service.ErrInvalidWarranty):
+		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, service.ErrForbidden):
 		writeError(w, http.StatusForbidden, "insufficient permission: must belong to this shop with at least the required hierarchical level, or be an administrator")
 	default:

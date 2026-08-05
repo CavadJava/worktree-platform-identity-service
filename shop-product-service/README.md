@@ -27,6 +27,10 @@ Mağaza sahibi öz mağazası üçün **növ** (məs. "Ölçü") və hər növü
 - Silmək (növ və alt növ): `review(3)`+ səviyyəli mağaza əməkdaşı və ya administrator.
 - Oxumaq (siyahı/tək): public.
 
+## Dərin sahələr (brend, material, çəki, mənşə, zəmanət)
+
+`Product` beş opsional "dərin" atribut daşıya bilər: `brand`, `material`, `weight_kg`, `origin_country`, `warranty_months`. Hər biri üçün cavabda avtomatik bir `has_*` bool sahəsi gəlir (`has_brand`, `has_material`, `has_weight`, `has_origin`, `has_warranty`) — sahə doldurulubsa `true`, boşdursa/göndərilməyibsə `false`. Bu bayraqlar DB-də saxlanılmır, hər dəfə `Product.ComputeFlags()` ilə əsas sahədən **hesablanır** — heç vaxt öz mənbəyindən "yayına" bilməz. `weight_kg` göndərilirsə `0`-dan böyük, `warranty_months` göndərilirsə `0`-dan kiçik olmamalıdır (əks halda `400 bad_request`). `PUT` bütöv obyekt kimi işləyir — sahə bədəndə yoxdursa, mövcud dəyər silinir (digər sahələr kimi eyni davranış).
+
 ## Favoritlər
 
 İstənilən login olmuş istifadəçi bir məhsulu favoritə əlavə edə bilər (sahiblik/səviyyə tələb olunmur) — `product_favorites (user_id, product_id)`, idempotent (`ON CONFLICT DO NOTHING`).
@@ -50,10 +54,10 @@ Default port: **8087**. Swagger UI: http://localhost:8087/swagger/index.html
 | Method | Path                 | Auth                                     | Body |
 |--------|----------------------|--------------------------------------------|------|
 | GET    | /health              | -                                            | - |
-| POST   | /api/v1/products     | Bearer (add-product(2)+ / administrator)    | `{shop_id, name, description, price, stock, product_type_id?}` |
+| POST   | /api/v1/products     | Bearer (add-product(2)+ / administrator)    | `{shop_id, name, description, price, stock, product_type_id?, brand?, material?, weight_kg?, origin_country?, warranty_months?}` |
 | GET    | /api/v1/products     | -                                             | - (opt. `?shop_id=`) |
 | GET    | /api/v1/products/{id}| -                                             | - |
-| PUT    | /api/v1/products/{id}| Bearer (add-product(2)+ / administrator)    | `{name, description, price, stock, product_type_id?}` |
+| PUT    | /api/v1/products/{id}| Bearer (add-product(2)+ / administrator)    | `{name, description, price, stock, product_type_id?, brand?, material?, weight_kg?, origin_country?, warranty_months?}` |
 | DELETE | /api/v1/products/{id}| Bearer (review(3)+ / administrator)         | - |
 | POST   | /api/v1/products/{id}/favorite | Bearer (istənilən login istifadəçi) | - |
 | DELETE | /api/v1/products/{id}/favorite | Bearer (istənilən login istifadəçi) | - |
