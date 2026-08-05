@@ -55,6 +55,7 @@ func main() {
 			r.Post("/roles/assign", roleHandler.Assign)
 			r.Post("/roles/revoke", roleHandler.Revoke)
 			r.Get("/roles/{user_id}", roleHandler.Get)
+			r.Get("/shops/{shop_id}/staff", roleHandler.ListStaff)
 		})
 	})
 

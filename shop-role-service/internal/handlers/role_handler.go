@@ -127,6 +127,48 @@ func (h *RoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeAssignment(w, assignment, err)
 }
 
+type staffMemberResponse struct {
+	UserID        string `json:"user_id"`
+	Email         string `json:"email"`
+	FullName      string `json:"full_name"`
+	ShopRoleLevel int    `json:"shop_role_level"`
+}
+
+// ListStaff godoc
+// @Summary      List a shop's staff
+// @Description  Sistem administratoru istənilən mağazanın, mağazanın öz admin(4)-ü isə yalnız öz mağazasının əməkdaşlarını görə bilər.
+// @Tags         roles
+// @Produce      json
+// @Security     BearerAuth
+// @Param        shop_id path string true "Shop ID"
+// @Success      200 {array} staffMemberResponse
+// @Failure      403 {object} map[string]string
+// @Router       /shops/{shop_id}/staff [get]
+func (h *RoleHandler) ListStaff(w http.ResponseWriter, r *http.Request) {
+	caller, ok := callerFromContext(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	shopID := chi.URLParam(r, "shop_id")
+	staff, err := h.svc.ListStaff(r.Context(), caller, shopID)
+	if err != nil {
+		if errors.Is(err, service.ErrForbidden) {
+			writeError(w, http.StatusForbidden, "administrator, or the shop's own admin(4) for this specific shop, required")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to list staff")
+		return
+	}
+
+	response := make([]staffMemberResponse, len(staff))
+	for i, m := range staff {
+		response[i] = staffMemberResponse{UserID: m.UserID, Email: m.Email, FullName: m.FullName, ShopRoleLevel: m.ShopRoleLevel}
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
 func callerFromContext(r *http.Request) (service.Caller, bool) {
 	identity, ok := middleware.IdentityFromContext(r.Context())
 	if !ok {

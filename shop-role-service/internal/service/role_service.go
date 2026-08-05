@@ -108,3 +108,12 @@ func (s *RoleService) Revoke(ctx context.Context, caller Caller, userID string) 
 	}
 	return &Assignment{UserID: userID, ShopID: nil, ShopRoleLevel: roles.ShopLevelNone}, nil
 }
+
+// ListStaff returns everyone assigned to shopID. The system administrator
+// can list any shop; a shop's own admin(4) can only list their own.
+func (s *RoleService) ListStaff(ctx context.Context, caller Caller, shopID string) ([]repository.StaffMember, error) {
+	if !caller.isSystemAdmin() && !caller.isShopOwnerOf(shopID) {
+		return nil, ErrForbidden
+	}
+	return s.repo.ListByShop(ctx, shopID)
+}

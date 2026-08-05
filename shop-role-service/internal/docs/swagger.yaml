@@ -23,15 +23,29 @@ definitions:
       user_id:
         type: string
     type: object
+  internal_handlers.staffMemberResponse:
+    properties:
+      email:
+        type: string
+      full_name:
+        type: string
+      shop_role_level:
+        type: integer
+      user_id:
+        type: string
+    type: object
 info:
   contact: {}
   description: 'İstifadəçini bir mağazaya hierarxik səviyyə ilə təyin edir: admin(4)
-    > review(3) > add-product(2) > chat(1). Yalnız administrator çağıra bilər.'
+    > review(3) > add-product(2) > chat(1). Sistem administratoru istənilən mağazaya,
+    mağazanın öz admin(4)-ü isə yalnız öz mağazasına əməkdaş təyin edə bilər.'
   title: Shop Role Service API
   version: "1.0"
 paths:
   /roles/{user_id}:
     get:
+      description: Sistem administratoru istənilən istifadəçini, mağazanın öz admin(4)-ü
+        isə yalnız öz mağazasındakı əməkdaşları görə bilər.
       parameters:
       - description: User ID
         in: path
@@ -66,8 +80,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: admin(4) > review(3) > add-product(2) > chat(1). Yalnız administrator
-        çağıra bilər. Bir istifadəçi eyni anda yalnız bir mağazaya aid ola bilər.
+      description: admin(4) > review(3) > add-product(2) > chat(1). Sistem administratoru
+        istənilən mağazaya, mağazanın öz admin(4)-ü isə yalnız öz mağazasına əməkdaş
+        təyin edə bilər. Bir istifadəçi eyni anda yalnız bir mağazaya aid ola bilər.
       parameters:
       - description: Assign payload
         in: body
@@ -109,8 +124,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: shop_id-ni sıfırlayır və şəviyyəni 0-a endirir. Yalnız administrator
-        çağıra bilər.
+      description: shop_id-ni sıfırlayır və şəviyyəni 0-a endirir. Sistem administratoru
+        istənilən istifadəçini, mağazanın öz admin(4)-ü isə yalnız öz mağazasındakı
+        əməkdaşı çıxara bilər.
       parameters:
       - description: Revoke payload
         in: body
@@ -146,6 +162,36 @@ paths:
       security:
       - BearerAuth: []
       summary: Remove a user from their shop
+      tags:
+      - roles
+  /shops/{shop_id}/staff:
+    get:
+      description: Sistem administratoru istənilən mağazanın, mağazanın öz admin(4)-ü
+        isə yalnız öz mağazasının əməkdaşlarını görə bilər.
+      parameters:
+      - description: Shop ID
+        in: path
+        name: shop_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_handlers.staffMemberResponse'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List a shop's staff
       tags:
       - roles
 securityDefinitions:

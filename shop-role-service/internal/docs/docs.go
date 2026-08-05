@@ -22,7 +22,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "admin(4) \u003e review(3) \u003e add-product(2) \u003e chat(1). Yalnız administrator çağıra bilər. Bir istifadəçi eyni anda yalnız bir mağazaya aid ola bilər.",
+                "description": "admin(4) \u003e review(3) \u003e add-product(2) \u003e chat(1). Sistem administratoru istənilən mağazaya, mağazanın öz admin(4)-ü isə yalnız öz mağazasına əməkdaş təyin edə bilər. Bir istifadəçi eyni anda yalnız bir mağazaya aid ola bilər.",
                 "consumes": [
                     "application/json"
                 ],
@@ -88,7 +88,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "shop_id-ni sıfırlayır və şəviyyəni 0-a endirir. Yalnız administrator çağıra bilər.",
+                "description": "shop_id-ni sıfırlayır və şəviyyəni 0-a endirir. Sistem administratoru istənilən istifadəçini, mağazanın öz admin(4)-ü isə yalnız öz mağazasındakı əməkdaşı çıxara bilər.",
                 "consumes": [
                     "application/json"
                 ],
@@ -154,6 +154,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Sistem administratoru istənilən istifadəçini, mağazanın öz admin(4)-ü isə yalnız öz mağazasındakı əməkdaşları görə bilər.",
                 "produces": [
                     "application/json"
                 ],
@@ -188,6 +189,52 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/shops/{shop_id}/staff": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sistem administratoru istənilən mağazanın, mağazanın öz admin(4)-ü isə yalnız öz mağazasının əməkdaşlarını görə bilər.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "roles"
+                ],
+                "summary": "List a shop's staff",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Shop ID",
+                        "name": "shop_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_handlers.staffMemberResponse"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -235,6 +282,23 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "internal_handlers.staffMemberResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string"
+                },
+                "shop_role_level": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
         }
     },
     "securityDefinitions": {
@@ -253,7 +317,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "Shop Role Service API",
-	Description:      "İstifadəçini bir mağazaya hierarxik səviyyə ilə təyin edir: admin(4) > review(3) > add-product(2) > chat(1). Yalnız administrator çağıra bilər.",
+	Description:      "İstifadəçini bir mağazaya hierarxik səviyyə ilə təyin edir: admin(4) > review(3) > add-product(2) > chat(1). Sistem administratoru istənilən mağazaya, mağazanın öz admin(4)-ü isə yalnız öz mağazasına əməkdaş təyin edə bilər.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
