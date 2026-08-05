@@ -40,10 +40,17 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := database.Migrate(db); err != nil {
+		log.Fatalf("migration error: %v", err)
+	}
+
 	userRepo := repository.NewUserRepository(db)
+	addressRepo := repository.NewAddressRepository(db)
 	authClient := client.NewAuthorizationClient(cfg.AuthorizationBaseURL)
 	profileService := service.NewProfileService(userRepo)
+	addressService := service.NewAddressService(addressRepo)
 	profileHandler := handlers.NewProfileHandler(profileService)
+	addressHandler := handlers.NewAddressHandler(addressService)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -68,6 +75,11 @@ func main() {
 			r.Use(appmiddleware.Auth(authClient))
 			r.Get("/profile", profileHandler.Get)
 			r.Put("/profile", profileHandler.Update)
+
+			r.Get("/addresses", addressHandler.List)
+			r.Post("/addresses", addressHandler.Create)
+			r.Put("/addresses/{id}", addressHandler.Update)
+			r.Delete("/addresses/{id}", addressHandler.Delete)
 		})
 	})
 

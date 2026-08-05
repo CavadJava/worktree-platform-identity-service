@@ -44,6 +44,7 @@ func main() {
 	appRepo := repository.NewShopApplicationRepository(db)
 	userAssignRepo := repository.NewUserAssignmentRepository(db)
 	subscriptionRepo := repository.NewSubscriptionRepository(db)
+	couponRepo := repository.NewCouponRepository(db)
 
 	authClient := client.NewAuthorizationClient(cfg.AuthorizationBaseURL)
 	notificationClient := client.NewNotificationClient(cfg.NotificationBaseURL)
@@ -51,10 +52,12 @@ func main() {
 	shopService := service.NewShopService(shopRepo)
 	appService := service.NewShopApplicationService(appRepo, shopRepo, userAssignRepo, notificationClient)
 	subscriptionService := service.NewSubscriptionService(subscriptionRepo, shopRepo)
+	couponService := service.NewCouponService(couponRepo)
 
 	shopHandler := handlers.NewShopHandler(shopService)
 	appHandler := handlers.NewShopApplicationHandler(appService)
 	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService)
+	couponHandler := handlers.NewCouponHandler(couponService)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -77,6 +80,7 @@ func main() {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/shops", shopHandler.List)
 		r.Get("/shops/{id}", shopHandler.Get)
+		r.Get("/coupons", couponHandler.List)
 
 		r.Group(func(r chi.Router) {
 			r.Use(appmiddleware.RequireAdministrator(authClient))
@@ -94,6 +98,9 @@ func main() {
 			r.Post("/shops/{id}/subscribe", subscriptionHandler.Subscribe)
 			r.Delete("/shops/{id}/subscribe", subscriptionHandler.Unsubscribe)
 			r.Get("/subscriptions", subscriptionHandler.List)
+
+			r.Post("/coupons/{id}/claim", couponHandler.Claim)
+			r.Get("/my-coupons", couponHandler.MyCoupons)
 		})
 
 		r.Group(func(r chi.Router) {
@@ -102,6 +109,9 @@ func main() {
 			r.Post("/shop-applications/{id}/send-form", appHandler.SendForm)
 			r.Post("/shop-applications/{id}/approve", appHandler.Approve)
 			r.Post("/shop-applications/{id}/reject", appHandler.Reject)
+
+			r.Post("/coupons", couponHandler.Create)
+			r.Delete("/coupons/{id}", couponHandler.Delete)
 		})
 	})
 

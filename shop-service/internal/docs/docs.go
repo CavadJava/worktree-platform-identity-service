@@ -15,6 +15,215 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/coupons": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "coupons"
+                ],
+                "summary": "List active coupons",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Coupon"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "coupons"
+                ],
+                "summary": "Create a coupon (administrator only)",
+                "parameters": [
+                    {
+                        "description": "Coupon payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.couponRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.Coupon"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/coupons/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "coupons"
+                ],
+                "summary": "Delete a coupon (administrator only)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Coupon ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/coupons/{id}/claim": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "İdempotentdir — artıq götürülmüş kuponu yenidən götürmək xəta deyil.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "coupons"
+                ],
+                "summary": "Claim a coupon for the current user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Coupon ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Coupon"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/my-coupons": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "coupons"
+                ],
+                "summary": "List the current user's claimed coupons",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.UserCoupon"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/shop-applications": {
             "get": {
                 "security": [
@@ -43,7 +252,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/shop-service_internal_models.ShopApplication"
+                                "$ref": "#/definitions/models.ShopApplication"
                             }
                         }
                     },
@@ -82,7 +291,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.applicationRequest"
+                            "$ref": "#/definitions/handlers.applicationRequest"
                         }
                     }
                 ],
@@ -90,7 +299,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/shop-service_internal_models.ShopApplication"
+                            "$ref": "#/definitions/models.ShopApplication"
                         }
                     },
                     "400": {
@@ -142,7 +351,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shop-service_internal_models.ShopApplication"
+                            "$ref": "#/definitions/models.ShopApplication"
                         }
                     },
                     "403": {
@@ -194,7 +403,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shop-service_internal_models.ShopApplication"
+                            "$ref": "#/definitions/models.ShopApplication"
                         }
                     },
                     "400": {
@@ -258,7 +467,7 @@ const docTemplate = `{
                         "name": "request",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.rejectRequest"
+                            "$ref": "#/definitions/handlers.rejectRequest"
                         }
                     }
                 ],
@@ -266,7 +475,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shop-service_internal_models.ShopApplication"
+                            "$ref": "#/definitions/models.ShopApplication"
                         }
                     },
                     "400": {
@@ -327,7 +536,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shop-service_internal_models.ShopApplication"
+                            "$ref": "#/definitions/models.ShopApplication"
                         }
                     },
                     "400": {
@@ -383,7 +592,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/shop-service_internal_models.Shop"
+                                "$ref": "#/definitions/models.Shop"
                             }
                         }
                     }
@@ -413,7 +622,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.shopRequest"
+                            "$ref": "#/definitions/handlers.shopRequest"
                         }
                     }
                 ],
@@ -421,7 +630,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/shop-service_internal_models.Shop"
+                            "$ref": "#/definitions/models.Shop"
                         }
                     },
                     "400": {
@@ -476,7 +685,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shop-service_internal_models.Shop"
+                            "$ref": "#/definitions/models.Shop"
                         }
                     },
                     "404": {
@@ -521,7 +730,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.shopRequest"
+                            "$ref": "#/definitions/handlers.shopRequest"
                         }
                     }
                 ],
@@ -529,7 +738,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shop-service_internal_models.Shop"
+                            "$ref": "#/definitions/models.Shop"
                         }
                     },
                     "400": {
@@ -605,10 +814,98 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/shops/{id}/subscribe": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "summary": "Subscribe to a shop",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Shop ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "summary": "Unsubscribe from a shop",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Shop ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
+        "/subscriptions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "summary": "List shops I'm subscribed to",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Shop"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
-        "internal_handlers.applicationRequest": {
+        "handlers.applicationRequest": {
             "type": "object",
             "properties": {
                 "description": {
@@ -619,7 +916,25 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.rejectRequest": {
+        "handlers.couponRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "discount_percent": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "valid_until": {
+                    "description": "RFC3339, boş = müddətsiz",
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.rejectRequest": {
             "type": "object",
             "properties": {
                 "reason": {
@@ -627,7 +942,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.shopRequest": {
+        "handlers.shopRequest": {
             "type": "object",
             "properties": {
                 "description": {
@@ -638,7 +953,30 @@ const docTemplate = `{
                 }
             }
         },
-        "shop-service_internal_models.Shop": {
+        "models.Coupon": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "discount_percent": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "valid_until": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Shop": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -656,6 +994,9 @@ const docTemplate = `{
                 "owner_id": {
                     "type": "string"
                 },
+                "shop_seq": {
+                    "type": "integer"
+                },
                 "temporary": {
                     "type": "boolean"
                 },
@@ -664,7 +1005,7 @@ const docTemplate = `{
                 }
             }
         },
-        "shop-service_internal_models.ShopApplication": {
+        "models.ShopApplication": {
             "type": "object",
             "properties": {
                 "applicant_id": {
@@ -698,6 +1039,32 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.UserCoupon": {
+            "type": "object",
+            "properties": {
+                "claimed_at": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "discount_percent": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "valid_until": {
                     "type": "string"
                 }
             }

@@ -1,25 +1,52 @@
 basePath: /api/v1
 definitions:
-  internal_handlers.applicationRequest:
+  handlers.applicationRequest:
     properties:
       description:
         type: string
       name:
         type: string
     type: object
-  internal_handlers.rejectRequest:
+  handlers.couponRequest:
+    properties:
+      code:
+        type: string
+      discount_percent:
+        type: integer
+      title:
+        type: string
+      valid_until:
+        description: RFC3339, boş = müddətsiz
+        type: string
+    type: object
+  handlers.rejectRequest:
     properties:
       reason:
         type: string
     type: object
-  internal_handlers.shopRequest:
+  handlers.shopRequest:
     properties:
       description:
         type: string
       name:
         type: string
     type: object
-  shop-service_internal_models.Shop:
+  models.Coupon:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      discount_percent:
+        type: integer
+      id:
+        type: string
+      title:
+        type: string
+      valid_until:
+        type: string
+    type: object
+  models.Shop:
     properties:
       created_at:
         type: string
@@ -31,12 +58,14 @@ definitions:
         type: string
       owner_id:
         type: string
+      shop_seq:
+        type: integer
       temporary:
         type: boolean
       updated_at:
         type: string
     type: object
-  shop-service_internal_models.ShopApplication:
+  models.ShopApplication:
     properties:
       applicant_id:
         type: string
@@ -61,6 +90,23 @@ definitions:
       updated_at:
         type: string
     type: object
+  models.UserCoupon:
+    properties:
+      claimed_at:
+        type: string
+      code:
+        type: string
+      created_at:
+        type: string
+      discount_percent:
+        type: integer
+      id:
+        type: string
+      title:
+        type: string
+      valid_until:
+        type: string
+    type: object
 info:
   contact: {}
   description: Mağazaların CRUD idarəetməsi + mağaza açma müraciəti/təsdiq axını.
@@ -71,6 +117,137 @@ info:
   title: Shop Service API
   version: "1.0"
 paths:
+  /coupons:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Coupon'
+            type: array
+      summary: List active coupons
+      tags:
+      - coupons
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Coupon payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.couponRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Coupon'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a coupon (administrator only)
+      tags:
+      - coupons
+  /coupons/{id}:
+    delete:
+      parameters:
+      - description: Coupon ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a coupon (administrator only)
+      tags:
+      - coupons
+  /coupons/{id}/claim:
+    post:
+      description: İdempotentdir — artıq götürülmüş kuponu yenidən götürmək xəta deyil.
+      parameters:
+      - description: Coupon ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Coupon'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Claim a coupon for the current user
+      tags:
+      - coupons
+  /my-coupons:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.UserCoupon'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List the current user's claimed coupons
+      tags:
+      - coupons
   /shop-applications:
     get:
       parameters:
@@ -85,7 +262,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/shop-service_internal_models.ShopApplication'
+              $ref: '#/definitions/models.ShopApplication'
             type: array
         "403":
           description: Forbidden
@@ -110,14 +287,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.applicationRequest'
+          $ref: '#/definitions/handlers.applicationRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/shop-service_internal_models.ShopApplication'
+            $ref: '#/definitions/models.ShopApplication'
         "400":
           description: Bad Request
           schema:
@@ -151,7 +328,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shop-service_internal_models.ShopApplication'
+            $ref: '#/definitions/models.ShopApplication'
         "403":
           description: Forbidden
           schema:
@@ -185,7 +362,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shop-service_internal_models.ShopApplication'
+            $ref: '#/definitions/models.ShopApplication'
         "400":
           description: Bad Request
           schema:
@@ -225,14 +402,14 @@ paths:
         in: body
         name: request
         schema:
-          $ref: '#/definitions/internal_handlers.rejectRequest'
+          $ref: '#/definitions/handlers.rejectRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shop-service_internal_models.ShopApplication'
+            $ref: '#/definitions/models.ShopApplication'
         "400":
           description: Bad Request
           schema:
@@ -274,7 +451,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shop-service_internal_models.ShopApplication'
+            $ref: '#/definitions/models.ShopApplication'
         "400":
           description: Bad Request
           schema:
@@ -312,7 +489,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/shop-service_internal_models.Shop'
+              $ref: '#/definitions/models.Shop'
             type: array
       summary: List shops
       tags:
@@ -329,14 +506,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.shopRequest'
+          $ref: '#/definitions/handlers.shopRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/shop-service_internal_models.Shop'
+            $ref: '#/definitions/models.Shop'
         "400":
           description: Bad Request
           schema:
@@ -402,7 +579,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shop-service_internal_models.Shop'
+            $ref: '#/definitions/models.Shop'
         "404":
           description: Not Found
           schema:
@@ -427,14 +604,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.shopRequest'
+          $ref: '#/definitions/handlers.shopRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shop-service_internal_models.Shop'
+            $ref: '#/definitions/models.Shop'
         "400":
           description: Bad Request
           schema:
@@ -458,6 +635,59 @@ paths:
       summary: Update a shop
       tags:
       - shops
+  /shops/{id}/subscribe:
+    delete:
+      parameters:
+      - description: Shop ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Unsubscribe from a shop
+      tags:
+      - subscriptions
+    post:
+      parameters:
+      - description: Shop ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Subscribe to a shop
+      tags:
+      - subscriptions
+  /subscriptions:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Shop'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List shops I'm subscribed to
+      tags:
+      - subscriptions
 securityDefinitions:
   BearerAuth:
     in: header

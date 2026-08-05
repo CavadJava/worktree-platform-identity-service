@@ -12,8 +12,9 @@ import (
 )
 
 // Connect opens a pool against the same Postgres instance/table that
-// registration-service owns and migrates. This service only reads/writes
-// the existing `users` table — it never creates or alters schema.
+// registration-service owns and migrates. For the `users` table this
+// service only reads/writes existing columns; the `user_addresses` table
+// below is owned (created/migrated) by this service.
 func Connect(cfg *config.Config) (*sql.DB, error) {
 	db, err := sql.Open("pgx", cfg.DSN())
 	if err != nil {
@@ -32,4 +33,23 @@ func Connect(cfg *config.Config) (*sql.DB, error) {
 	}
 
 	return db, nil
+}
+
+func Migrate(db *sql.DB) error {
+	const schema = `
+		CREATE TABLE IF NOT EXISTS user_addresses (
+			id UUID PRIMARY KEY,
+			user_id UUID NOT NULL,
+			title VARCHAR(100) NOT NULL,
+			full_address TEXT NOT NULL,
+			city VARCHAR(100),
+			phone VARCHAR(50),
+			is_default BOOLEAN NOT NULL DEFAULT false,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		);
+		CREATE INDEX IF NOT EXISTS idx_user_addresses_user_id ON user_addresses (user_id);
+	`
+	_, err := db.Exec(schema)
+	return err
 }
