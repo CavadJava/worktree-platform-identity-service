@@ -35,7 +35,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/shop-order-service_internal_models.Order"
+                                "$ref": "#/definitions/models.Order"
                             }
                         }
                     }
@@ -65,7 +65,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createOrderRequest"
+                            "$ref": "#/definitions/handlers.createOrderRequest"
                         }
                     }
                 ],
@@ -73,7 +73,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/shop-order-service_internal_models.Order"
+                            "$ref": "#/definitions/models.Order"
                         }
                     },
                     "400": {
@@ -125,7 +125,80 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shop-order-service_internal_models.Order"
+                            "$ref": "#/definitions/models.Order"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/orders/{id}/status": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mağazanın add-product(2)+ əməkdaşı/administrator istənilən sonrakı mərhələyə (o cümlədən \"delivered\") keçirə bilər. Sifarişin öz müştərisi YALNIZ \"delivered\" təyin edə bilər (təhvil aldığını təsdiqləmək) — başqa heç bir mərhələ yox. Geriyə hərəkət və ya cari mərhələni təkrar təyin etmək qadağandır.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "orders"
+                ],
+                "summary": "Move an order forward in its delivery pipeline",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New status: pending | processing | shipped | in_transit | delivered",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.updateStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Order"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "403": {
@@ -179,7 +252,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/shop-order-service_internal_models.Order"
+                                "$ref": "#/definitions/models.Order"
                             }
                         }
                     },
@@ -197,13 +270,13 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "internal_handlers.createOrderRequest": {
+        "handlers.createOrderRequest": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_handlers.orderItemRequest"
+                        "$ref": "#/definitions/handlers.orderItemRequest"
                     }
                 },
                 "shop_id": {
@@ -211,7 +284,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.orderItemRequest": {
+        "handlers.orderItemRequest": {
             "type": "object",
             "properties": {
                 "product_item_id": {
@@ -222,7 +295,15 @@ const docTemplate = `{
                 }
             }
         },
-        "shop-order-service_internal_models.Order": {
+        "handlers.updateStatusRequest": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Order": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -234,7 +315,7 @@ const docTemplate = `{
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/shop-order-service_internal_models.OrderItem"
+                        "$ref": "#/definitions/models.OrderItem"
                     }
                 },
                 "order_number": {
@@ -257,7 +338,7 @@ const docTemplate = `{
                 }
             }
         },
-        "shop-order-service_internal_models.OrderItem": {
+        "models.OrderItem": {
             "type": "object",
             "properties": {
                 "created_at": {

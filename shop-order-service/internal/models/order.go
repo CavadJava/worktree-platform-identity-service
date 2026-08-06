@@ -2,9 +2,32 @@ package models
 
 import "time"
 
+// Order status is a strictly forward-moving pipeline — a shop (or the
+// admin) drives it from Pending through to Delivered; a customer can only
+// ever set it to Delivered themselves (confirming receipt), never any
+// other stage. StatusOrder defines that sequence; see service.UpdateStatus
+// for the transition rule ("no backward moves, no skipping to an earlier
+// stage than the current one").
 const (
-	StatusPending = "pending"
+	StatusPending    = "pending"    // sifariş qəbul edildi
+	StatusProcessing = "processing" // mağaza hazırlayır
+	StatusShipped    = "shipped"    // mağazadan çıxdı, daşıyıcıya verildi
+	StatusInTransit  = "in_transit" // yoldadır (məs. gömrük/hava limanı)
+	StatusDelivered  = "delivered"  // müştəriyə çatıb — son mərhələ
 )
+
+var StatusOrder = []string{StatusPending, StatusProcessing, StatusShipped, StatusInTransit, StatusDelivered}
+
+// StatusIndex returns a status's position in the pipeline, or -1 if it
+// isn't a recognized status.
+func StatusIndex(status string) int {
+	for i, s := range StatusOrder {
+		if s == status {
+			return i
+		}
+	}
+	return -1
+}
 
 type Order struct {
 	ID          string      `json:"id"`

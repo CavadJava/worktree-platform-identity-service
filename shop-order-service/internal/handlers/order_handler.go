@@ -31,6 +31,10 @@ type createOrderRequest struct {
 	Items  []orderItemRequest `json:"items"`
 }
 
+type updateStatusRequest struct {
+	Status string `json:"status"`
+}
+
 // Create godoc
 // @Summary      Create an order
 // @Description  İstənilən login olmuş istifadəçi bir mağazadan bir və ya bir neçə məhsul VARİANTI (product_item_id, məs. "30x60 1 qat") seçib sifariş yarada bilər. Qiymət (endirimli olsa endirim qiyməti) və ad sifariş anında "şəkil" kimi saxlanılır (sonradan dəyişsə belə sifariş dəyişmir).
@@ -152,9 +156,49 @@ func (h *OrderHandler) ListForShop(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, orders)
 }
 
+// UpdateStatus godoc
+// @Summary      Move an order forward in its delivery pipeline
+// @Description  Mağazanın add-product(2)+ əməkdaşı/administrator istənilən sonrakı mərhələyə (o cümlədən "delivered") keçirə bilər. Sifarişin öz müştərisi YALNIZ "delivered" təyin edə bilər (təhvil aldığını təsdiqləmək) — başqa heç bir mərhələ yox. Geriyə hərəkət və ya cari mərhələni təkrar təyin etmək qadağandır.
+// @Tags         orders
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Order ID"
+// @Param        request body updateStatusRequest true "New status: pending | processing | shipped | in_transit | delivered"
+// @Success      200 {object} models.Order
+// @Failure      400 {object} map[string]string
+// @Failure      403 {object} map[string]string
+// @Failure      404 {object} map[string]string
+// @Router       /orders/{id}/status [put]
+func (h *OrderHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
+	identity, ok := middleware.IdentityFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+
+	var req updateStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	order, err := h.svc.UpdateStatus(r.Context(), toIdentity(identity), id, req.Status)
+	if err != nil {
+		writeOrderError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, order)
+}
+
 func writeOrderError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrItemsRequired), errors.Is(err, service.ErrInvalidQuantity), errors.Is(err, service.ErrProductShopMismatch):
+		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, service.ErrInvalidStatus), errors.Is(err, service.ErrStatusNotForward), errors.Is(err, service.ErrCustomerCanOnlyConfirm):
 		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, service.ErrOrderNotFound):
 		writeError(w, http.StatusNotFound, "order not found")
@@ -165,7 +209,7 @@ func writeOrderError(w http.ResponseWriter, err error) {
 	case errors.Is(err, service.ErrUserNotFound):
 		writeError(w, http.StatusNotFound, "user not found")
 	case errors.Is(err, service.ErrForbidden):
-		writeError(w, http.StatusForbidden, "not authorized to view this order")
+		writeError(w, http.StatusForbidden, "not authorized for this order")
 	default:
 		writeError(w, http.StatusInternalServerError, "failed to process request")
 	}

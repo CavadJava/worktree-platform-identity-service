@@ -19,6 +19,14 @@ shop-order-service bu iki sütunu, həmçinin [shop-product-service](../shop-pro
 - Hər sətirdə məhsulun/variantın cari adı və həll olunmuş qiyməti sifariş yaradılan anda **"şəkil" kimi saxlanılır** (`order_items.product_name`/`item_name`/`unit_price`) — mağaza sonradan qiyməti/endirimi dəyişsə belə, artıq yaranmış sifariş dəyişmir.
 - Kim baxa bilər: sifarişi verən istifadəçi, mağazanın **add-product(2)+** səviyyəli əməkdaşı, ya da administrator.
 
+## Çatdırılma statusu
+
+Sifariş `pending`-dən başlayır və **yalnız irəliyə** hərəkət edir: `pending → processing → shipped → in_transit → delivered`. Geriyə qayıtmaq və ya cari mərhələni təkrar təyin etmək qadağandır (`400 bad_request`); irəli **atlamaq** isə sərbəstdir (məs. mağaza birbaşa `pending`-dən `delivered`-ə keçirə bilər — kiçik/yerli sifarişlər üçün).
+
+- **Mağaza** (`add-product(2)+` əməkdaş, ya da administrator) istənilən sonrakı mərhələyə keçirə bilər, o cümlədən `delivered`-ə — bu, "mağaza təhvil verildi statusuna keçirir" tələbinin qarşılığıdır.
+- **Sifarişin öz müştərisi** YALNIZ `delivered` təyin edə bilər (çatdığını təsdiqləmək) — başqa heç bir mərhələ yox. Bu, "müştəri özü təsdiq edir" tələbinin qarşılığıdır.
+- Hər iki yol da eyni `delivered` statusuna aparır — sistem kim təyin etdiyini fərqləndirmir, sadəcə hər ikisinə icazə verir.
+
 ## Ödəniş
 
 Sifariş uğurla yaranan kimi [payment-service](../payment-service)-ə `POST /payments` göndərilir (sinxron, amma uğursuz olsa sifarişi pozmur — sadəcə loglanır) — "müştəri ödəniş edir" anının qarşılığı. Bu, mağazanın müvəqqəti bakiyəsini artırır; mağaza öz ödənişlərini payment-service üzərindən izləyir.
@@ -45,6 +53,7 @@ Default port: **8089**. Swagger UI: http://localhost:8089/swagger/index.html
 | POST   | /api/v1/orders                    | Bearer (istənilən login istifadəçi)              | `{shop_id, items:[{product_item_id, quantity}]}` |
 | GET    | /api/v1/orders                    | Bearer (istənilən login istifadəçi)              | - (öz sifarişləri) |
 | GET    | /api/v1/orders/{id}                | Bearer (sifarişi verən / mağazanın add-product(2)+ / admin) | - |
+| PUT    | /api/v1/orders/{id}/status         | Bearer (mağaza: hər hansı sonrakı mərhələ / müştəri: yalnız `delivered`) | `{status}` — `pending`\|`processing`\|`shipped`\|`in_transit`\|`delivered` |
 | GET    | /api/v1/shops/{shop_id}/orders     | Bearer (mağazanın add-product(2)+ əməkdaşı / admin) | - |
 
 Bax [../ARCHITECTURE.md](../ARCHITECTURE.md) tam servislərarası axın üçün.

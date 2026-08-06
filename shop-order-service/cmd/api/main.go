@@ -72,6 +72,7 @@ func main() {
 			r.Post("/orders", orderHandler.Create)
 			r.Get("/orders", orderHandler.ListMine)
 			r.Get("/orders/{id}", orderHandler.Get)
+			r.Put("/orders/{id}/status", orderHandler.UpdateStatus)
 			r.Get("/shops/{shop_id}/orders", orderHandler.ListForShop)
 		})
 	})

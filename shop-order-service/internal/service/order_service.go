@@ -16,14 +16,17 @@ import (
 )
 
 var (
-	ErrItemsRequired       = errors.New("at least one item is required")
-	ErrInvalidQuantity     = errors.New("quantity must be greater than zero")
-	ErrProductShopMismatch = errors.New("product item does not belong to the specified shop")
-	ErrOrderNotFound       = repository.ErrOrderNotFound
-	ErrProductItemNotFound = repository.ErrProductItemNotFound
-	ErrShopNotFound        = repository.ErrShopNotFound
-	ErrUserNotFound        = repository.ErrUserNotFound
-	ErrForbidden           = errors.New("forbidden")
+	ErrItemsRequired          = errors.New("at least one item is required")
+	ErrInvalidQuantity        = errors.New("quantity must be greater than zero")
+	ErrProductShopMismatch    = errors.New("product item does not belong to the specified shop")
+	ErrOrderNotFound          = repository.ErrOrderNotFound
+	ErrProductItemNotFound    = repository.ErrProductItemNotFound
+	ErrShopNotFound           = repository.ErrShopNotFound
+	ErrUserNotFound           = repository.ErrUserNotFound
+	ErrForbidden              = errors.New("forbidden")
+	ErrInvalidStatus          = errors.New("unrecognized status")
+	ErrStatusNotForward       = errors.New("status must move forward in the pipeline (pending → processing → shipped → in_transit → delivered), never backward or to the current stage")
+	ErrCustomerCanOnlyConfirm = errors.New("a customer may only confirm delivery (set status to delivered), not any other stage")
 )
 
 // Identity is the calling user's claims, as returned by authorization-service.
@@ -175,6 +178,42 @@ func (s *OrderService) ListForShop(ctx context.Context, caller Identity, shopID 
 		return nil, ErrForbidden
 	}
 	return s.orders.ListByShop(ctx, shopID)
+}
+
+// UpdateStatus moves an order forward through its delivery pipeline.
+//
+//   - The shop's own add-product(2)+ staff (or the system administrator)
+//     can set it to any later stage, including delivered — this is "mağaza
+//     təhvil verildi statusuna keçirir".
+//   - The order's own customer can only ever set it to delivered — this is
+//     "müştəri özü təsdiq edir" (confirming receipt), nothing else.
+//   - Nobody can move it backward or re-set the current stage.
+func (s *OrderService) UpdateStatus(ctx context.Context, caller Identity, orderID, newStatus string) (*models.Order, error) {
+	order, err := s.orders.FindByID(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	newIdx := models.StatusIndex(newStatus)
+	if newIdx == -1 {
+		return nil, ErrInvalidStatus
+	}
+
+	isShopStaff := caller.isSystemAdmin() || caller.isShopStaffOf(order.ShopID)
+	if !isShopStaff {
+		if caller.UserID != order.UserID {
+			return nil, ErrForbidden
+		}
+		if newStatus != models.StatusDelivered {
+			return nil, ErrCustomerCanOnlyConfirm
+		}
+	}
+
+	if newIdx <= models.StatusIndex(order.Status) {
+		return nil, ErrStatusNotForward
+	}
+
+	return s.orders.UpdateStatus(ctx, orderID, newStatus)
 }
 
 func (s *OrderService) canView(caller Identity, order *models.Order) bool {

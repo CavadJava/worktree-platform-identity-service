@@ -86,6 +86,23 @@ func (r *OrderRepository) FindByID(ctx context.Context, id string) (*models.Orde
 	return o, nil
 }
 
+// UpdateStatus is a plain column write — the transition rule (forward-only,
+// who's allowed to set what) lives in the service layer, not here.
+func (r *OrderRepository) UpdateStatus(ctx context.Context, id, status string) (*models.Order, error) {
+	result, err := r.db.ExecContext(ctx, `UPDATE orders SET status = $2, updated_at = now() WHERE id = $1`, id, status)
+	if err != nil {
+		return nil, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if affected == 0 {
+		return nil, ErrOrderNotFound
+	}
+	return r.FindByID(ctx, id)
+}
+
 func (r *OrderRepository) ListByUser(ctx context.Context, userID string) ([]*models.Order, error) {
 	const q = `
 		SELECT id, order_number, user_id, shop_id, status, total_amount, created_at, updated_at
