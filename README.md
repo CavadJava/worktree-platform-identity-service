@@ -37,6 +37,16 @@ for p in 8081 8082 8083 8084 8085 8086 8087 8088 8089 8090 8091 8092 8093 8094; 
 
 Hər servisin Swagger UI-ı: `http://localhost:<port>/swagger/index.html`
 
+## Seed skriptləri
+
+`scripts/seed-taobao-marketplace.sh` — `taobao-v1` mobil tətbiqinin checkout/chat axını üçün lazım olan `"Taobao Marketplace"` mağazasını və onun 10 mock məhsulunu (`taobao-v1/src/data/products.ts`-i güzgüləyir) yaradır. İdempotentdir — nə çatışmırsa yalnız onu əlavə edir, təkrar işə salmaq təhlükəsizdir:
+
+```bash
+./scripts/seed-taobao-marketplace.sh
+```
+
+Tələb edir: `registration-service`, `shop-service`, `shop-product-service` ayaqda olsun + bir administrator hesabı (default `admin@example.com`/`password123`, `ADMIN_EMAIL`/`ADMIN_PASSWORD` env ilə override edilə bilər).
+
 ## CORS
 
 Bütün servislər default olaraq `http://localhost:5173`-dən (Vite dev server) gələn brauzer sorğularına icazə verir — `CORS_ALLOWED_ORIGINS` env dəyişəni ilə (vergüllə ayrılmış siyahı) hər servisdə fərdi tənzimlənə bilər. Frontend inkişafı zamanı əlavə CORS konfiqurasiyası tələb olunmur.
