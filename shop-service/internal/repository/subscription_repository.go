@@ -31,6 +31,30 @@ func (r *SubscriptionRepository) Remove(ctx context.Context, userID, shopID stri
 	return err
 }
 
+// ListByShop returns a shop's subscribers (just user_id + when), newest first.
+func (r *SubscriptionRepository) ListByShop(ctx context.Context, shopID string) ([]*models.Subscriber, error) {
+	const q = `
+		SELECT user_id, created_at FROM shop_subscriptions
+		WHERE shop_id = $1
+		ORDER BY created_at DESC
+	`
+	rows, err := r.db.QueryContext(ctx, q, shopID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	subscribers := []*models.Subscriber{}
+	for rows.Next() {
+		sub := &models.Subscriber{}
+		if err := rows.Scan(&sub.UserID, &sub.CreatedAt); err != nil {
+			return nil, err
+		}
+		subscribers = append(subscribers, sub)
+	}
+	return subscribers, rows.Err()
+}
+
 // ListByUser returns the full shop rows a user is subscribed to, newest first.
 func (r *SubscriptionRepository) ListByUser(ctx context.Context, userID string) ([]*models.Shop, error) {
 	const q = `

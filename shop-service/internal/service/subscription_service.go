@@ -5,6 +5,7 @@ import (
 
 	"shop-service/internal/models"
 	"shop-service/internal/repository"
+	"shop-service/internal/roles"
 )
 
 type SubscriptionService struct {
@@ -31,4 +32,14 @@ func (s *SubscriptionService) Unsubscribe(ctx context.Context, userID, shopID st
 
 func (s *SubscriptionService) List(ctx context.Context, userID string) ([]*models.Shop, error) {
 	return s.subscriptions.ListByUser(ctx, userID)
+}
+
+// ListSubscribers is the shop side of the relationship: any of the shop's
+// own staff (chat(1)+, so the whole team — not owner-only) or a system
+// administrator can see who's subscribed.
+func (s *SubscriptionService) ListSubscribers(ctx context.Context, identity Identity, shopID string) ([]*models.Subscriber, error) {
+	if !canManage(identity, shopID, roles.ShopLevelChat) {
+		return nil, ErrForbidden
+	}
+	return s.subscriptions.ListByShop(ctx, shopID)
 }

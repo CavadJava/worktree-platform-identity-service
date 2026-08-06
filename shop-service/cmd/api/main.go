@@ -98,6 +98,7 @@ func main() {
 			r.Post("/shops/{id}/subscribe", subscriptionHandler.Subscribe)
 			r.Delete("/shops/{id}/subscribe", subscriptionHandler.Unsubscribe)
 			r.Get("/subscriptions", subscriptionHandler.List)
+			r.Get("/shops/{id}/subscribers", subscriptionHandler.ListSubscribers)
 
 			r.Post("/coupons/{id}/claim", couponHandler.Claim)
 			r.Get("/my-coupons", couponHandler.MyCoupons)

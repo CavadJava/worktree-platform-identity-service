@@ -29,7 +29,7 @@ Hər dəyişiklikdə (`send-form`/`approve`/`reject`) [notification-service](../
 
 ## Abunəlik
 
-İstənilən login olmuş istifadəçi bir mağazaya abunə ola bilər (sahiblik/səviyyə tələb olunmur) — `shop_subscriptions (user_id, shop_id)`, idempotent (`ON CONFLICT DO NOTHING`).
+İstənilən login olmuş istifadəçi bir mağazaya abunə ola bilər (sahiblik/səviyyə tələb olunmur) — `shop_subscriptions (user_id, shop_id)`, idempotent (`ON CONFLICT DO NOTHING`). `GET /subscriptions` bu münasibətin **müştəri** tərəfidir (öz abunəlikləri); `GET /shops/{id}/subscribers` isə **mağaza** tərəfidir (kim abunədir) — mağazanın `chat(1)+` səviyyəli əməkdaşı və ya administrator görə bilər.
 
 ## `shop_seq`
 
@@ -69,5 +69,6 @@ Default port: **8086**. Swagger UI: http://localhost:8086/swagger/index.html
 | POST   | /api/v1/shops/{id}/subscribe              | Bearer (istənilən login istifadəçi)     | - |
 | DELETE | /api/v1/shops/{id}/subscribe              | Bearer (istənilən login istifadəçi)     | - |
 | GET    | /api/v1/subscriptions                     | Bearer (istənilən login istifadəçi)     | - (öz abunəlikləri) |
+| GET    | /api/v1/shops/{id}/subscribers            | Bearer (chat(1)+ / administrator)       | - (mağazanın abunəçiləri) |
 
 Bax [../ARCHITECTURE.md](../ARCHITECTURE.md) tam servislərarası axın üçün.
