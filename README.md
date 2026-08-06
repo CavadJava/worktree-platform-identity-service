@@ -1,6 +1,6 @@
 # go-project-practices
 
-13 ayrı Go mikroservisi: qeydiyyat/login, profil, bildiriş, autorizasiya, mağaza rolları, mağaza CRUD + müraciət axını + abunəlik, məhsul CRUD + favoritlər, istifadəçi↔mağaza yazışması, sifarişlər, çoxdilli mətnlər, mərkəzi loglama, kataloq (kateqoriyalar), rəylər (reyting + şəkil/video). Arxitektura və servislərin bir-biri ilə əlaqəsi üçün bax [ARCHITECTURE.md](ARCHITECTURE.md).
+14 ayrı Go mikroservisi: qeydiyyat/login, profil, bildiriş, autorizasiya, mağaza rolları, mağaza CRUD + müraciət axını + abunəlik, məhsul CRUD + favoritlər, istifadəçi↔mağaza yazışması, sifarişlər, çoxdilli mətnlər, mərkəzi loglama, kataloq (kateqoriyalar), rəylər (reyting + şəkil/video), ödənişlər + mağaza bakiyəsi. Arxitektura və servislərin bir-biri ilə əlaqəsi üçün bax [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Tələblər
 
@@ -10,7 +10,7 @@
 
 ## Servisləri işə salmaq
 
-Hər servisin öz `.env`-i var (repo-da hazır, lokal inkişaf üçün). 13 ayrı terminalda:
+Hər servisin öz `.env`-i var (repo-da hazır, lokal inkişaf üçün). 14 ayrı terminalda:
 
 ```bash
 cd notification-service   && go run ./cmd/api   # :8083
@@ -26,12 +26,13 @@ cd localization-service   && go run ./cmd/api   # :8090
 cd log-service            && go run ./cmd/api   # :8091
 cd shop-category-service  && go run ./cmd/api   # :8092
 cd review-service         && go run ./cmd/api   # :8093
+cd payment-service        && go run ./cmd/api   # :8094
 ```
 
 Sıra fərq etmir, amma tam axın üçün hamısı ayaqda olmalıdır. Yoxlamaq:
 
 ```bash
-for p in 8081 8082 8083 8084 8085 8086 8087 8088 8089 8090 8091 8092 8093; do curl -s http://localhost:$p/health; echo " :$p"; done
+for p in 8081 8082 8083 8084 8085 8086 8087 8088 8089 8090 8091 8092 8093 8094; do curl -s http://localhost:$p/health; echo " :$p"; done
 ```
 
 Hər servisin Swagger UI-ı: `http://localhost:<port>/swagger/index.html`
@@ -395,3 +396,4 @@ curl "http://localhost:8090/api/v1/locales"
 | Mərkəzi loglama | [log-service](log-service) | 8091 | [README](log-service/README.md) |
 | Kataloq (kateqoriyalar) | [shop-category-service](shop-category-service) | 8092 | [README](shop-category-service/README.md) |
 | Rəylər (reyting + şəkil/video) | [review-service](review-service) | 8093 | [README](review-service/README.md) |
+| Ödənişlər + mağaza bakiyəsi | [payment-service](payment-service) | 8094 | [README](payment-service/README.md) |

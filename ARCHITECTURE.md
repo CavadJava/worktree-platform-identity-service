@@ -1,6 +1,6 @@
 # Arxitektura
 
-13 ayrı Go mikroservisi, ortaq bir PostgreSQL instansiyasına (`localhost:5433`) qoşulur.
+14 ayrı Go mikroservisi, ortaq bir PostgreSQL instansiyasına (`localhost:5433`) qoşulur.
 
 ```
  registration-service :8081 ──POST /notifications──▶ notification-service :8083
@@ -57,6 +57,7 @@
 | log-service                    | 8091 | mərkəzi log anbarı (bütün servislərin request logları) | var, `service_logs` sxeminin sahibi | - |
 | shop-category-service          | 8092 | sistem-səviyyəli kataloq (kateqoriya/alt-kateqoriya)   | var, `categories`/`subcategories` sxemlərinin sahibi | authorization-service |
 | review-service                  | 8093 | məhsul rəyi (reyting + mətn) + şəkil/video əlavələri   | var, `reviews`/`review_media` sxemlərinin sahibi | authorization-service |
+| payment-service                  | 8094 | ödəniş qeydiyyatı + mağazanın müvəqqəti bakiyəsi       | var, `payments`/`payment_items`/`shop_balances` sxemlərinin sahibi | authorization-service |
 
 ## Niyə belə bölündü
 
@@ -139,6 +140,10 @@ Bunlar istənilən login olmuş istifadəçi üçün açıqdır (sahiblik/səviy
 - **Kim baxa bilər**: `GET /orders` — öz sifarişlərim (`user_id` ilə filtrlənib). `GET /orders/{id}` — sifarişi verən istifadəçi, mağazanın **add-product(2)+** səviyyəli əməkdaşı, ya da administrator. `GET /shops/{shop_id}/orders` — mağaza tərəfi, eyni səviyyə tələbi (sifarişlərə baxmaq add-product(2) səviyyəsinin — "mağazanın satış/kataloq idarəçiliyi" mənasının — təbii davamı sayılıb, sırf mesajlaşma olan `chat(1)`-dən fərqli olaraq).
 - shop-order-service `orders`/`order_items` cədvəllərinin sxem sahibidir, amma `users.user_seq`, `shops.shop_seq`, `products`+`product_items` (JOIN ilə: variantın adı/qiyməti/endirimi + valideynin adı/`shop_id`-si) üçün **birbaşa, read-only** eyni Postgres instansiyasından oxuyur — digər servislərin (məs. shop-role-service-in `users`-ı oxuması) artıq qurulmuş "ortaq DB, konkret sütun/cədvəl üçün nəzarətli cross-read" konvensiyasını izləyir, əlavə HTTP round-trip-lər olmadan.
 
+## Ödənişlər və mağaza bakiyəsi ([payment-service](payment-service), :8094)
+
+shop-order-service sifariş yaradan kimi **sinxron** `POST /payments` göndərir — "müştəri ödəniş edir" anının mock qarşılığıdır (real ödəniş gateway-i yoxdur, ona görə `status` həmişə birbaşa `completed`). Bir `Payment` bir `Order`-lə 1:1-dir (`order_id` üzərində unikal indeks, təkrar cəhd `409 conflict`) — sifarişlər həmişə tək-mağaza olduğu üçün ödəniş də təbii tək-mağazadır. Hər `PaymentItem` `OrderItem` kimi məhsul adını/sayını/qiymətini sifariş anında saxlayır (snapshot). Hər ödəniş, bir tranzaksiya daxilində, mağazanın **müvəqqəti bakiyəsini** (`shop_balances`) artırır — bu, hələ ki yalnız payment-service daxilində yaşayan bir dəftərdir; real bank hesabına köçürmə (payout) gələcək bir funksiyadır, bu sxem onu bloklamır. `POST /payments` daxili, auth-siz çağırışdır (notification-service-in `POST /notifications`-ı ilə eyni konvensiya); `GET /shops/{id}/payments`/`balance` mağazanın **chat(1)+** əməkdaşına (bütün komanda, təkcə sahib yox) və ya administrator-a açıqdır. Ödəniş yazılması uğursuz olsa belə sifariş **pozulmur** — sadəcə loglanır, notification fan-out-un izlədiyi "ikinci dərəcəli narahatlıq əsas yazını pozmamalıdır" prinsipi.
+
 ## Çoxdilli mətnlər ([localization-service](localization-service), :8090)
 
 `translations (namespace, key, locale, value)` — unikal `(namespace, key, locale)`. İlk açılışda bütün servislərin response-envelope-unda artıq istifadə olunan error code-ları (`bad_request`, `unauthorized`, `forbidden`, `not_found`, `conflict`, `internal_error`, `service_unavailable`, `error`) `errors` namespace-i altında az/en/ru dillərində avtomatik yüklənir (idempotent seed, admin redaktələrini əzmir) — bu, `error.code`-u alıb lokallaşdırılmış mesaj göstərmək istəyən istənilən client üçün hazır inteqrasiya nöqtəsidir. Oxumaq (`list`/`map`/`lookup`/`locales`) public-dir; yazmaq yalnız administrator üçündür. `lookup` sorğulanan locale tapılmasa `DEFAULT_LOCALE`-a (default `az`) fallback edir.
@@ -149,11 +154,11 @@ Bütün servislər hər bitmiş HTTP sorğusunu (method, path, status, müddət 
 
 ## CORS
 
-Bütün 13 servis `github.com/go-chi/cors` ilə brauzer-mənşəli sorğulara icazə verir — default olaraq `http://localhost:5173` (Vite dev server) `CORS_ALLOWED_ORIGINS` env dəyişəni ilə tənzimlənir (vergüllə ayrılmış siyahı). `Authorization`, `Content-Type` başlıqlarına və `GET/POST/PUT/DELETE/OPTIONS` metodlarına icazə verilir.
+Bütün 14 servis `github.com/go-chi/cors` ilə brauzer-mənşəli sorğulara icazə verir — default olaraq `http://localhost:5173` (Vite dev server) `CORS_ALLOWED_ORIGINS` env dəyişəni ilə tənzimlənir (vergüllə ayrılmış siyahı). `Authorization`, `Content-Type` başlıqlarına və `GET/POST/PUT/DELETE/OPTIONS` metodlarına icazə verilir.
 
 ## Cavab formatı (uğur/xəta)
 
-Bütün 13 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarır:
+Bütün 14 servisin bütün endpoint-ləri eyni JSON zərfini (envelope) qaytarır:
 
 ```json
 // uğurlu:
@@ -184,6 +189,7 @@ cd localization-service   && go run ./cmd/api   # :8090
 cd log-service            && go run ./cmd/api   # :8091
 cd shop-category-service  && go run ./cmd/api   # :8092
 cd review-service         && go run ./cmd/api   # :8093
+cd payment-service        && go run ./cmd/api   # :8094
 ```
 
 Hər servisin öz Swagger UI-ı var: `http://localhost:<port>/swagger/index.html`

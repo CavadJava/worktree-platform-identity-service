@@ -19,6 +19,10 @@ shop-order-service bu iki sütunu, həmçinin [shop-product-service](../shop-pro
 - Hər sətirdə məhsulun/variantın cari adı və həll olunmuş qiyməti sifariş yaradılan anda **"şəkil" kimi saxlanılır** (`order_items.product_name`/`item_name`/`unit_price`) — mağaza sonradan qiyməti/endirimi dəyişsə belə, artıq yaranmış sifariş dəyişmir.
 - Kim baxa bilər: sifarişi verən istifadəçi, mağazanın **add-product(2)+** səviyyəli əməkdaşı, ya da administrator.
 
+## Ödəniş
+
+Sifariş uğurla yaranan kimi [payment-service](../payment-service)-ə `POST /payments` göndərilir (sinxron, amma uğursuz olsa sifarişi pozmur — sadəcə loglanır) — "müştəri ödəniş edir" anının qarşılığı. Bu, mağazanın müvəqqəti bakiyəsini artırır; mağaza öz ödənişlərini payment-service üzərindən izləyir.
+
 ## Stack
 - Go 1.26 + chi router
 - PostgreSQL (`pgx`) — `orders`, `order_items` cədvəllərinin sahibi + `users`/`shops`/`products`/`product_items`-ı oxuyur

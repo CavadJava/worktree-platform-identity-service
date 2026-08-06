@@ -9,20 +9,20 @@ import (
 	"github.com/go-chi/cors"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
-	"shop-order-service/internal/client"
-	appconfig "shop-order-service/internal/config"
-	"shop-order-service/internal/database"
-	_ "shop-order-service/internal/docs"
-	"shop-order-service/internal/handlers"
-	"shop-order-service/internal/logclient"
-	appmiddleware "shop-order-service/internal/middleware"
-	"shop-order-service/internal/repository"
-	"shop-order-service/internal/service"
+	"payment-service/internal/client"
+	appconfig "payment-service/internal/config"
+	"payment-service/internal/database"
+	_ "payment-service/internal/docs"
+	"payment-service/internal/handlers"
+	"payment-service/internal/logclient"
+	appmiddleware "payment-service/internal/middleware"
+	"payment-service/internal/repository"
+	"payment-service/internal/service"
 )
 
-// @title           Shop Order Service API
+// @title           Payment Service API
 // @version         1.0
-// @description     İstifadəçilərin mağazalardan məhsul seçib sifariş yaratması. Sifariş nömrəsi "U<istifadəçi_seq>-S<mağaza_seq>-<n>" formatındadır (<n> — istifadəçinin neçənci sifarişi olduğu).
+// @description     Sifariş ödənişlərinin qeydiyyatı və mağazaların müvəqqəti bakiyəsi. shop-order-service hər sifariş yaradılandan sonra bura POST /payments göndərir; mağaza öz ödənişlərini və bakiyəsini burdan izləyir.
 // @BasePath        /api/v1
 // @securityDefinitions.apikey BearerAuth
 // @in header
@@ -40,13 +40,11 @@ func main() {
 		log.Fatalf("migration error: %v", err)
 	}
 
-	orderRepo := repository.NewOrderRepository(db)
-	lookupRepo := repository.NewLookupRepository(db)
+	paymentRepo := repository.NewPaymentRepository(db)
 
 	authClient := client.NewAuthorizationClient(cfg.AuthorizationBaseURL)
-	paymentClient := client.NewPaymentClient(cfg.PaymentBaseURL)
-	orderService := service.NewOrderService(orderRepo, lookupRepo, paymentClient)
-	orderHandler := handlers.NewOrderHandler(orderService)
+	paymentService := service.NewPaymentService(paymentRepo)
+	paymentHandler := handlers.NewPaymentHandler(paymentService)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -58,7 +56,7 @@ func main() {
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
-	r.Use(logclient.RequestLogger(logclient.New(cfg.LogServiceURL, "shop-order-service")))
+	r.Use(logclient.RequestLogger(logclient.New(cfg.LogServiceURL, "payment-service")))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))
@@ -67,16 +65,18 @@ func main() {
 	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
 	r.Route("/api/v1", func(r chi.Router) {
+		// Internal, service-to-service — no auth (same convention as
+		// notification-service's POST /notifications).
+		r.Post("/payments", paymentHandler.Create)
+
 		r.Group(func(r chi.Router) {
 			r.Use(appmiddleware.RequireAuth(authClient))
-			r.Post("/orders", orderHandler.Create)
-			r.Get("/orders", orderHandler.ListMine)
-			r.Get("/orders/{id}", orderHandler.Get)
-			r.Get("/shops/{shop_id}/orders", orderHandler.ListForShop)
+			r.Get("/shops/{id}/payments", paymentHandler.ListByShop)
+			r.Get("/shops/{id}/balance", paymentHandler.GetBalance)
 		})
 	})
 
-	log.Printf("shop-order-service listening on :%s", cfg.Port)
+	log.Printf("payment-service listening on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, r); err != nil {
 		log.Fatalf("server error: %v", err)
 	}

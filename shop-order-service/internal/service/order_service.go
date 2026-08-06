@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
 
+	"shop-order-service/internal/client"
 	"shop-order-service/internal/models"
 	"shop-order-service/internal/repository"
 	"shop-order-service/internal/roles"
@@ -46,12 +48,13 @@ type ItemInput struct {
 }
 
 type OrderService struct {
-	orders *repository.OrderRepository
-	lookup *repository.LookupRepository
+	orders   *repository.OrderRepository
+	lookup   *repository.LookupRepository
+	payments *client.PaymentClient
 }
 
-func NewOrderService(orders *repository.OrderRepository, lookup *repository.LookupRepository) *OrderService {
-	return &OrderService{orders: orders, lookup: lookup}
+func NewOrderService(orders *repository.OrderRepository, lookup *repository.LookupRepository, payments *client.PaymentClient) *OrderService {
+	return &OrderService{orders: orders, lookup: lookup, payments: payments}
 }
 
 // Create validates every line item's product_item belongs to shopID,
@@ -125,6 +128,28 @@ func (s *OrderService) Create(ctx context.Context, userID, shopID string, items 
 	if err := s.orders.Create(ctx, order); err != nil {
 		return nil, err
 	}
+
+	// Record the payment synchronously — the shop's balance should reflect
+	// the sale the instant the order is placed, not after an eventual-
+	// consistency lag. Still non-fatal: a payment-service hiccup must not
+	// undo an order that's already been written (same "secondary concern
+	// never breaks the primary write" rule notification fan-out follows
+	// elsewhere in this codebase).
+	if s.payments != nil {
+		paymentItems := make([]client.PaymentItemInput, 0, len(orderItems))
+		for _, it := range orderItems {
+			paymentItems = append(paymentItems, client.PaymentItemInput{
+				ProductID:   it.ProductID,
+				ProductName: it.ProductName,
+				Quantity:    it.Quantity,
+				UnitPrice:   it.UnitPrice,
+			})
+		}
+		if err := s.payments.RecordPayment(ctx, order.ID, userID, shopID, total, paymentItems); err != nil {
+			log.Printf("record payment: order %s: %v", order.ID, err)
+		}
+	}
+
 	return order, nil
 }
 
