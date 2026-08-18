@@ -94,6 +94,33 @@ func (r *UserRepository) ListByProject(ctx context.Context, projectID string) ([
 	return users, rows.Err()
 }
 
+const selectUserWithRoleAndProject = `
+	SELECT u.id, u.name, u.username, u.email, u.password_hash, u.project_id, u.role_id,
+	       COALESCE(r.name, ''), COALESCE(p.name, ''), u.created_at, u.updated_at
+	FROM users u
+	LEFT JOIN roles r ON r.id = u.role_id
+	LEFT JOIN projects p ON p.id = u.project_id
+`
+
+func (r *UserRepository) ListAll(ctx context.Context) ([]models.User, error) {
+	rows, err := r.db.QueryContext(ctx, selectUserWithRoleAndProject+" ORDER BY u.created_at")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := []models.User{}
+	for rows.Next() {
+		var u models.User
+		if err := rows.Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.PasswordHash,
+			&u.ProjectID, &u.RoleID, &u.RoleName, &u.ProjectName, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
 func (r *UserRepository) CountByProject(ctx context.Context, projectID string) (int, error) {
 	const q = `SELECT COUNT(*) FROM users WHERE project_id = $1`
 	var count int

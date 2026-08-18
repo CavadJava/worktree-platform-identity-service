@@ -201,6 +201,67 @@ func TestUserRepository_GetByUsernameOrEmail(t *testing.T) {
 	}
 }
 
+func TestUserRepository_ListAll(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	projectRepo := NewProjectRepository(db)
+	userRepo := NewUserRepository(db)
+
+	p1 := &models.Project{ID: uuid.NewString(), Name: "ListAll A " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	p2 := &models.Project{ID: uuid.NewString(), Name: "ListAll B " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	if err := projectRepo.Create(context.Background(), p1); err != nil {
+		t.Fatalf("create p1 failed: %v", err)
+	}
+	if err := projectRepo.Create(context.Background(), p2); err != nil {
+		t.Fatalf("create p2 failed: %v", err)
+	}
+
+	adminRoleID := int16(2)
+	u1 := &models.User{
+		ID: uuid.NewString(), Name: "P1 User", Username: "listall-p1-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", PasswordHash: "hash",
+		ProjectID: &p1.ID, RoleID: &adminRoleID,
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	u2 := &models.User{
+		ID: uuid.NewString(), Name: "P2 User", Username: "listall-p2-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", PasswordHash: "hash",
+		ProjectID: &p2.ID, RoleID: &adminRoleID,
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	for _, u := range []*models.User{u1, u2} {
+		if err := userRepo.Create(context.Background(), u); err != nil {
+			t.Fatalf("create user failed: %v", err)
+		}
+	}
+
+	got, err := userRepo.ListAll(context.Background())
+	if err != nil {
+		t.Fatalf("ListAll failed: %v", err)
+	}
+
+	byID := map[string]models.User{}
+	for _, u := range got {
+		byID[u.ID] = u
+	}
+
+	found1, ok := byID[u1.ID]
+	if !ok {
+		t.Fatalf("expected u1 in ListAll result")
+	}
+	if found1.ProjectName != p1.Name {
+		t.Errorf("expected u1.ProjectName %q, got %q", p1.Name, found1.ProjectName)
+	}
+
+	found2, ok := byID[u2.ID]
+	if !ok {
+		t.Fatalf("expected u2 in ListAll result")
+	}
+	if found2.ProjectName != p2.Name {
+		t.Errorf("expected u2.ProjectName %q, got %q", p2.Name, found2.ProjectName)
+	}
+}
+
 func TestUserRepository_ListByProject(t *testing.T) {
 	db := testDB(t)
 	defer db.Close()
@@ -273,8 +334,8 @@ func TestRoleRepository_List(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
-	if len(roles) != 2 {
-		t.Fatalf("expected 2 seeded roles, got %d", len(roles))
+	if len(roles) != 3 {
+		t.Fatalf("expected 3 seeded roles, got %d", len(roles))
 	}
 	byName := map[string]int16{}
 	for _, r := range roles {
@@ -285,5 +346,8 @@ func TestRoleRepository_List(t *testing.T) {
 	}
 	if byName["admin"] != 2 {
 		t.Errorf("expected 'admin' role id 2, got %d", byName["admin"])
+	}
+	if byName["superadmin"] != 3 {
+		t.Errorf("expected 'superadmin' role id 3, got %d", byName["superadmin"])
 	}
 }
