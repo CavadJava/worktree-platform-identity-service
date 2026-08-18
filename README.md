@@ -27,12 +27,13 @@ cd log-service            && go run ./cmd/api   # :8091
 cd shop-category-service  && go run ./cmd/api   # :8092
 cd review-service         && go run ./cmd/api   # :8093
 cd payment-service        && go run ./cmd/api   # :8094
+cd platform-identity-service  && go run ./cmd/api   # :8095
 ```
 
 Sıra fərq etmir, amma tam axın üçün hamısı ayaqda olmalıdır. Yoxlamaq:
 
 ```bash
-for p in 8081 8082 8083 8084 8085 8086 8087 8088 8089 8090 8091 8092 8093 8094; do curl -s http://localhost:$p/health; echo " :$p"; done
+for p in 8081 8082 8083 8084 8085 8086 8087 8088 8089 8090 8091 8092 8093 8094 8095; do curl -s http://localhost:$p/health; echo " :$p"; done
 ```
 
 Hər servisin Swagger UI-ı: `http://localhost:<port>/swagger/index.html`
