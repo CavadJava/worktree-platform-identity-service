@@ -19,6 +19,9 @@ type Config struct {
 	JWTSecret     string
 	JWTTTLMinutes int
 
+	SuperadminUsername string
+	SuperadminPassword string
+
 	Port               string
 	CORSAllowedOrigins []string
 	LogServiceURL      string
@@ -41,6 +44,8 @@ func Load() (*Config, error) {
 		DBSSLMode:          getEnv("DB_SSLMODE", "disable"),
 		JWTSecret:          jwtSecret,
 		JWTTTLMinutes:      getEnvInt("JWT_TTL_MINUTES", 60*24),
+		SuperadminUsername: getEnv("SUPERADMIN_USERNAME", "superadmin"),
+		SuperadminPassword: getEnv("SUPERADMIN_PASSWORD", "superadmin-dev-password"),
 		Port:               getEnv("PORT", "8095"),
 		CORSAllowedOrigins: strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
 		LogServiceURL:      getEnv("LOG_SERVICE_URL", "http://localhost:8091"),

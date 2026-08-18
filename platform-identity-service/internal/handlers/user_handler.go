@@ -126,6 +126,56 @@ func (h *UserHandler) ListByProject(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
+type allUsersResponse struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Username    string `json:"username"`
+	Email       string `json:"email"`
+	Role        string `json:"role"`
+	ProjectID   string `json:"project_id,omitempty"`
+	ProjectName string `json:"project_name,omitempty"`
+}
+
+// ListAll godoc
+// @Summary      List every user across every project
+// @Description  Yalnız superadmin çağıra bilər.
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200 {array} allUsersResponse
+// @Failure      403 {object} map[string]string
+// @Router       /users [get]
+func (h *UserHandler) ListAll(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	users, err := h.svc.ListAll(r.Context(), caller)
+	if err != nil {
+		if errors.Is(err, service.ErrForbidden) {
+			writeError(w, http.StatusForbidden, "superadmin role required")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to list users")
+		return
+	}
+
+	response := make([]allUsersResponse, len(users))
+	for i, u := range users {
+		projectID := ""
+		if u.ProjectID != nil {
+			projectID = *u.ProjectID
+		}
+		response[i] = allUsersResponse{
+			ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email, Role: u.RoleName,
+			ProjectID: projectID, ProjectName: u.ProjectName,
+		}
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
 func writeUserOrError(w http.ResponseWriter, u *models.User, err error) {
 	if err != nil {
 		switch {

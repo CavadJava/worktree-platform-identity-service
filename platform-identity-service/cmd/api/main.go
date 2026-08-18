@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/google/uuid"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	"platform-identity-service/internal/auth"
@@ -44,6 +45,14 @@ func main() {
 		log.Fatalf("migration error: %v", err)
 	}
 
+	superadminHash, err := auth.HashPassword(cfg.SuperadminPassword)
+	if err != nil {
+		log.Fatalf("failed to hash superadmin password: %v", err)
+	}
+	if err := database.SeedSuperadmin(db, uuid.NewString(), cfg.SuperadminUsername, superadminHash); err != nil {
+		log.Fatalf("failed to seed superadmin: %v", err)
+	}
+
 	projectRepo := repository.NewProjectRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	roleRepo := repository.NewRoleRepository(db)
@@ -51,7 +60,7 @@ func main() {
 
 	projectService := service.NewProjectService(projectRepo)
 	authService := service.NewAuthService(projectRepo, userRepo, jwtManager)
-	userService := service.NewUserService(userRepo, roleassign.NewSameProjectAdmin())
+	userService := service.NewUserService(userRepo, roleassign.NewSuperadminOrSameProjectAdmin())
 	roleService := service.NewRoleService(roleRepo)
 
 	projectHandler := handlers.NewProjectHandler(projectService)
@@ -91,6 +100,7 @@ func main() {
 			r.Get("/users/{id}", userHandler.Get)
 			r.Post("/users/{id}/role", userHandler.SetRole)
 			r.Get("/projects/{id}/users", userHandler.ListByProject)
+			r.Get("/users", userHandler.ListAll)
 		})
 	})
 
