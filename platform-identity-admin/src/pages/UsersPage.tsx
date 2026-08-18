@@ -3,38 +3,61 @@ import { Button, Select, Space, Table, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { User } from '../api/types';
 import { listProjects } from '../api/projects';
-import { listUsersByProject, setUserRole } from '../api/users';
+import { listAllUsers, listUsersByProject, setUserRole } from '../api/users';
+import { useAuth } from '../auth/AuthContext';
 import { useQueryErrorToast } from '../hooks/useQueryErrorToast';
 
 export function UsersPage() {
+  const { claims } = useAuth();
+  const isSuperadmin = claims?.role === 'superadmin';
   const queryClient = useQueryClient();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   const { data: projects, isLoading: projectsLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: () => listProjects(),
+    enabled: !isSuperadmin,
   });
 
   const effectiveProjectId = selectedProjectId ?? projects?.[0]?.id ?? null;
   const effectiveProjectName = projects?.find((p) => p.id === effectiveProjectId)?.name ?? null;
 
   const {
-    data: users,
-    isLoading: usersLoading,
-    isError,
-    error,
+    data: scopedUsers,
+    isLoading: scopedUsersLoading,
+    isError: scopedIsError,
+    error: scopedError,
   } = useQuery({
     queryKey: ['project-users', effectiveProjectId],
     queryFn: () => listUsersByProject(effectiveProjectId!),
-    enabled: !!effectiveProjectId,
+    enabled: !isSuperadmin && !!effectiveProjectId,
   });
-  useQueryErrorToast(isError, error);
+
+  const {
+    data: allUsers,
+    isLoading: allUsersLoading,
+    isError: allIsError,
+    error: allError,
+  } = useQuery({
+    queryKey: ['all-users'],
+    queryFn: () => listAllUsers(),
+    enabled: isSuperadmin,
+  });
+
+  useQueryErrorToast(isSuperadmin ? allIsError : scopedIsError, isSuperadmin ? allError : scopedError);
+
+  const users = isSuperadmin ? allUsers : scopedUsers;
+  const usersLoading = isSuperadmin ? allUsersLoading : scopedUsersLoading;
 
   const setRoleMutation = useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: string }) => setUserRole(userId, role),
     onSuccess: () => {
       message.success('Rol dəyişdirildi');
-      queryClient.invalidateQueries({ queryKey: ['project-users', effectiveProjectId] });
+      if (isSuperadmin) {
+        queryClient.invalidateQueries({ queryKey: ['all-users'] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['project-users', effectiveProjectId] });
+      }
     },
     onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
   });
@@ -44,6 +67,7 @@ export function UsersPage() {
     { title: 'Username', dataIndex: 'username' },
     { title: 'Email', dataIndex: 'email' },
     { title: 'Rol', dataIndex: 'role' },
+    ...(isSuperadmin ? [{ title: 'Layihə', dataIndex: 'project_name' }] : []),
     {
       title: 'Əməliyyat',
       render: (_: unknown, record: User) => (
@@ -66,6 +90,10 @@ export function UsersPage() {
       ),
     },
   ];
+
+  if (isSuperadmin) {
+    return <Table rowKey="id" loading={usersLoading} dataSource={users} columns={columns} />;
+  }
 
   return (
     <>

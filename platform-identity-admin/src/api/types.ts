@@ -20,6 +20,8 @@ export interface User {
   username: string;
   email: string;
   role: string;
+  project_id?: string;
+  project_name?: string;
 }
 
 export interface JwtClaims {

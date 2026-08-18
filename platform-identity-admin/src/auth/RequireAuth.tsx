@@ -6,7 +6,7 @@ export function RequireAuth() {
   if (!token) {
     return <Navigate to="/login" replace />;
   }
-  if (claims?.role !== 'admin') {
+  if (claims?.role !== 'admin' && claims?.role !== 'superadmin') {
     return <Navigate to="/login" replace />;
   }
   return <Outlet />;

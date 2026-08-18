@@ -20,8 +20,8 @@ export function LoginPage() {
     try {
       const { token } = await login(values.identifier, values.password);
       const claims = decodeToken(token);
-      if (claims.role !== 'admin') {
-        message.error('Yalnız admin rolunda olan istifadəçilər giriş edə bilər');
+      if (claims.role !== 'admin' && claims.role !== 'superadmin') {
+        message.error('Yalnız admin və ya superadmin rolunda olan istifadəçilər giriş edə bilər');
         return;
       }
       setToken(token);
