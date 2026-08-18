@@ -201,6 +201,69 @@ func TestUserRepository_GetByUsernameOrEmail(t *testing.T) {
 	}
 }
 
+func TestUserRepository_ListByProject(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	projectRepo := NewProjectRepository(db)
+	userRepo := NewUserRepository(db)
+
+	p1 := &models.Project{ID: uuid.NewString(), Name: "ListByProject A " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	p2 := &models.Project{ID: uuid.NewString(), Name: "ListByProject B " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	if err := projectRepo.Create(context.Background(), p1); err != nil {
+		t.Fatalf("create p1 failed: %v", err)
+	}
+	if err := projectRepo.Create(context.Background(), p2); err != nil {
+		t.Fatalf("create p2 failed: %v", err)
+	}
+
+	adminRoleID := int16(2)
+	userRoleID := int16(1)
+	u1 := &models.User{
+		ID: uuid.NewString(), Name: "P1 Admin", Username: "p1admin-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", PasswordHash: "hash",
+		ProjectID: &p1.ID, RoleID: &adminRoleID,
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	u2 := &models.User{
+		ID: uuid.NewString(), Name: "P1 Member", Username: "p1member-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", PasswordHash: "hash",
+		ProjectID: &p1.ID, RoleID: &userRoleID,
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	u3 := &models.User{
+		ID: uuid.NewString(), Name: "P2 Admin", Username: "p2admin-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", PasswordHash: "hash",
+		ProjectID: &p2.ID, RoleID: &adminRoleID,
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	for _, u := range []*models.User{u1, u2, u3} {
+		if err := userRepo.Create(context.Background(), u); err != nil {
+			t.Fatalf("create user failed: %v", err)
+		}
+	}
+
+	got, err := userRepo.ListByProject(context.Background(), p1.ID)
+	if err != nil {
+		t.Fatalf("ListByProject failed: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 users in project p1, got %d", len(got))
+	}
+	ids := map[string]bool{}
+	for _, u := range got {
+		ids[u.ID] = true
+		if u.RoleName == "" {
+			t.Errorf("expected joined RoleName to be populated for user %s, got empty", u.ID)
+		}
+	}
+	if !ids[u1.ID] || !ids[u2.ID] {
+		t.Errorf("expected p1's two users in result, got ids: %v", ids)
+	}
+	if ids[u3.ID] {
+		t.Errorf("did not expect p2's user in p1's result")
+	}
+}
+
 func TestRoleRepository_List(t *testing.T) {
 	db := testDB(t)
 	defer db.Close()

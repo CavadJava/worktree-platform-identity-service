@@ -83,6 +83,49 @@ func (h *UserHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 	writeUserOrError(w, u, err)
 }
 
+type projectUserResponse struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
+}
+
+// ListByProject godoc
+// @Summary      List a project's users
+// @Description  Caller həmin layihənin admin-i olmalıdır.
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Project ID"
+// @Success      200 {array} projectUserResponse
+// @Failure      403 {object} map[string]string
+// @Router       /projects/{id}/users [get]
+func (h *UserHandler) ListByProject(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	projectID := chi.URLParam(r, "id")
+	users, err := h.svc.ListByProject(r.Context(), caller, projectID)
+	if err != nil {
+		if errors.Is(err, service.ErrForbidden) {
+			writeError(w, http.StatusForbidden, "admin role within this project required")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to list users")
+		return
+	}
+
+	response := make([]projectUserResponse, len(users))
+	for i, u := range users {
+		response[i] = projectUserResponse{ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email, Role: u.RoleName}
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
 func writeUserOrError(w http.ResponseWriter, u *models.User, err error) {
 	if err != nil {
 		switch {

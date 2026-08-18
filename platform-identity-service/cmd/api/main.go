@@ -90,6 +90,7 @@ func main() {
 			r.Use(appmiddleware.RequireAuth(jwtManager))
 			r.Get("/users/{id}", userHandler.Get)
 			r.Post("/users/{id}/role", userHandler.SetRole)
+			r.Get("/projects/{id}/users", userHandler.ListByProject)
 		})
 	})
 

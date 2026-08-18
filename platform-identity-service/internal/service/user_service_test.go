@@ -101,6 +101,56 @@ func TestUserService_SetRole_InvalidRoleNameRejected(t *testing.T) {
 	}
 }
 
+func TestUserService_ListByProject_SameProjectAdminSucceeds(t *testing.T) {
+	userSvc, authSvc, projectSvc := newTestUserService(t)
+
+	p, _ := projectSvc.Create(context.Background(), "ListByProject Success "+uuid.NewString())
+	admin, err := authSvc.Register(context.Background(), RegisterInput{
+		ProjectID: p.ID, Name: "Admin", Username: "admin-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register admin failed: %v", err)
+	}
+	_, err = authSvc.Register(context.Background(), RegisterInput{
+		ProjectID: p.ID, Name: "Member", Username: "member-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register member failed: %v", err)
+	}
+
+	caller := roleassign.Caller{UserID: admin.ID, ProjectID: p.ID, Role: admin.RoleName}
+	users, err := userSvc.ListByProject(context.Background(), caller, p.ID)
+	if err != nil {
+		t.Fatalf("ListByProject failed: %v", err)
+	}
+	if len(users) != 2 {
+		t.Errorf("expected 2 users (admin + member), got %d", len(users))
+	}
+}
+
+func TestUserService_ListByProject_CrossProjectForbidden(t *testing.T) {
+	userSvc, authSvc, projectSvc := newTestUserService(t)
+
+	p1, _ := projectSvc.Create(context.Background(), "ListByProject Cross A "+uuid.NewString())
+	p2, _ := projectSvc.Create(context.Background(), "ListByProject Cross B "+uuid.NewString())
+
+	admin1, err := authSvc.Register(context.Background(), RegisterInput{
+		ProjectID: p1.ID, Name: "Admin1", Username: "admin1-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register admin1 failed: %v", err)
+	}
+
+	caller := roleassign.Caller{UserID: admin1.ID, ProjectID: p1.ID, Role: admin1.RoleName}
+	_, err = userSvc.ListByProject(context.Background(), caller, p2.ID)
+	if err != ErrForbidden {
+		t.Errorf("expected ErrForbidden for cross-project list, got %v", err)
+	}
+}
+
 func TestUserService_SetRole_CrossProjectForbidden(t *testing.T) {
 	userSvc, authSvc, projectSvc := newTestUserService(t)
 

@@ -47,6 +47,16 @@ func (s *UserService) Get(ctx context.Context, caller roleassign.Caller, userID 
 	return target, nil
 }
 
+// ListByProject returns every user in projectID. Caller must be an admin
+// within that same project — reuses the same RoleAssigner check as SetRole,
+// with the project itself as the target (UserID is irrelevant to CanAssign).
+func (s *UserService) ListByProject(ctx context.Context, caller roleassign.Caller, projectID string) ([]models.User, error) {
+	if !s.assigner.CanAssign(caller, roleassign.Target{ProjectID: projectID}) {
+		return nil, ErrForbidden
+	}
+	return s.repo.ListByProject(ctx, projectID)
+}
+
 func (s *UserService) SetRole(ctx context.Context, caller roleassign.Caller, targetUserID, newRoleName string) (*models.User, error) {
 	target, err := s.repo.GetByID(ctx, targetUserID)
 	if err != nil {

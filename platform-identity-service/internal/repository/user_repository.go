@@ -75,6 +75,25 @@ func (r *UserRepository) GetByUsernameOrEmail(ctx context.Context, identifier st
 	return r.scanUser(row)
 }
 
+func (r *UserRepository) ListByProject(ctx context.Context, projectID string) ([]models.User, error) {
+	rows, err := r.db.QueryContext(ctx, selectUserWithRole+" WHERE u.project_id = $1 ORDER BY u.created_at", projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := []models.User{}
+	for rows.Next() {
+		var u models.User
+		if err := rows.Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.PasswordHash,
+			&u.ProjectID, &u.RoleID, &u.RoleName, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
 func (r *UserRepository) CountByProject(ctx context.Context, projectID string) (int, error) {
 	const q = `SELECT COUNT(*) FROM users WHERE project_id = $1`
 	var count int
