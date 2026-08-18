@@ -12,8 +12,8 @@ import (
 var ErrForbidden = errors.New("forbidden")
 
 var roleNameToID = map[string]int16{
-	"user":  roleIDUser,
-	"admin": roleIDAdmin,
+	models.RoleUser:  roleIDUser,
+	models.RoleAdmin: roleIDAdmin,
 }
 
 type UserService struct {

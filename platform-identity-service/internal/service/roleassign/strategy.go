@@ -4,6 +4,8 @@
 // the service layer that consumes it.
 package roleassign
 
+import "platform-identity-service/internal/models"
+
 type Caller struct {
 	UserID    string
 	ProjectID string
@@ -28,5 +30,5 @@ func NewSameProjectAdmin() *SameProjectAdmin {
 }
 
 func (s *SameProjectAdmin) CanAssign(caller Caller, target Target) bool {
-	return caller.Role == "admin" && caller.ProjectID == target.ProjectID
+	return caller.Role == models.RoleAdmin && caller.ProjectID != "" && caller.ProjectID == target.ProjectID
 }

@@ -29,6 +29,12 @@ func TestSameProjectAdmin_CanAssign(t *testing.T) {
 			target: Target{UserID: "u2", ProjectID: "p1"},
 			want:   false,
 		},
+		{
+			name:   "admin with empty project id cannot assign to target with empty project id",
+			caller: Caller{UserID: "u1", ProjectID: "", Role: "admin"},
+			target: Target{UserID: "u2", ProjectID: ""},
+			want:   false,
+		},
 	}
 
 	for _, tt := range tests {

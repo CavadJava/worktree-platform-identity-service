@@ -73,7 +73,7 @@ func (h *UserHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.Role != "user" && req.Role != "admin" {
+	if req.Role != models.RoleUser && req.Role != models.RoleAdmin {
 		writeError(w, http.StatusBadRequest, "role must be 'user' or 'admin'")
 		return
 	}

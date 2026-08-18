@@ -29,7 +29,10 @@ import (
 // @in header
 // @name Authorization
 func main() {
-	cfg := appconfig.Load()
+	cfg, err := appconfig.Load()
+	if err != nil {
+		log.Fatalf("config error: %v", err)
+	}
 
 	db, err := database.Connect(cfg)
 	if err != nil {

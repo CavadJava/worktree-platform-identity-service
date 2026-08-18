@@ -44,8 +44,8 @@ func Migrate(db *sql.DB) error {
 			name TEXT UNIQUE NOT NULL
 		);
 
-		INSERT INTO roles (name) VALUES ('user'), ('admin')
-		ON CONFLICT (name) DO NOTHING;
+		INSERT INTO roles (id, name) VALUES (1, 'user'), (2, 'admin')
+		ON CONFLICT (id) DO NOTHING;
 
 		CREATE TABLE IF NOT EXISTS users (
 			id UUID PRIMARY KEY,

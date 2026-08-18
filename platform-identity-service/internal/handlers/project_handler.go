@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
+	"platform-identity-service/internal/repository"
 	"platform-identity-service/internal/service"
 )
 
@@ -89,7 +91,12 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	p, err := h.svc.Get(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusNotFound, "project not found")
+		switch {
+		case errors.Is(err, repository.ErrProjectNotFound):
+			writeError(w, http.StatusNotFound, "project not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to get project")
+		}
 		return
 	}
 	writeJSON(w, http.StatusOK, projectResponse{ID: p.ID, Name: p.Name, CreatedAt: p.CreatedAt.Format(timeFormat)})

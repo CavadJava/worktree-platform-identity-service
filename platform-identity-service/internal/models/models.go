@@ -2,6 +2,13 @@ package models
 
 import "time"
 
+// Role name constants — single source of truth for the two role names
+// used across handlers, services, and authorization strategies.
+const (
+	RoleUser  = "user"
+	RoleAdmin = "admin"
+)
+
 type Project struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`

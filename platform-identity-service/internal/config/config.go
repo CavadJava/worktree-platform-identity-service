@@ -24,8 +24,13 @@ type Config struct {
 	LogServiceURL      string
 }
 
-func Load() *Config {
+func Load() (*Config, error) {
 	_ = godotenv.Load()
+
+	jwtSecret, ok := os.LookupEnv("JWT_SECRET")
+	if !ok || jwtSecret == "" {
+		return nil, fmt.Errorf("JWT_SECRET environment variable is required and must not be empty")
+	}
 
 	return &Config{
 		DBHost:             getEnv("DB_HOST", "localhost"),
@@ -34,12 +39,12 @@ func Load() *Config {
 		DBPassword:         getEnv("DB_PASSWORD", ""),
 		DBName:             getEnv("DB_NAME", "postgres"),
 		DBSSLMode:          getEnv("DB_SSLMODE", "disable"),
-		JWTSecret:          getEnv("JWT_SECRET", "dev-secret-change-me"),
+		JWTSecret:          jwtSecret,
 		JWTTTLMinutes:      getEnvInt("JWT_TTL_MINUTES", 60*24),
 		Port:               getEnv("PORT", "8095"),
 		CORSAllowedOrigins: strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
 		LogServiceURL:      getEnv("LOG_SERVICE_URL", "http://localhost:8091"),
-	}
+	}, nil
 }
 
 func (c *Config) DSN() string {

@@ -49,6 +49,58 @@ func TestUserService_SetRole_SameProjectAdminSucceeds(t *testing.T) {
 	}
 }
 
+func TestUserService_Get_NonAdminCannotReadAnotherUser(t *testing.T) {
+	userSvc, authSvc, projectSvc := newTestUserService(t)
+
+	p, _ := projectSvc.Create(context.Background(), "Get Forbidden "+uuid.NewString())
+	admin, err := authSvc.Register(context.Background(), RegisterInput{
+		ProjectID: p.ID, Name: "Admin", Username: "admin-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register admin failed: %v", err)
+	}
+	member, err := authSvc.Register(context.Background(), RegisterInput{
+		ProjectID: p.ID, Name: "Member", Username: "member-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register member failed: %v", err)
+	}
+
+	callerForSecondUser := roleassign.Caller{UserID: member.ID, ProjectID: p.ID, Role: member.RoleName}
+	_, err = userSvc.Get(context.Background(), callerForSecondUser, admin.ID)
+	if err != ErrForbidden {
+		t.Errorf("expected ErrForbidden for non-admin reading another user, got %v", err)
+	}
+}
+
+func TestUserService_SetRole_InvalidRoleNameRejected(t *testing.T) {
+	userSvc, authSvc, projectSvc := newTestUserService(t)
+
+	p, _ := projectSvc.Create(context.Background(), "Invalid Role "+uuid.NewString())
+	admin, err := authSvc.Register(context.Background(), RegisterInput{
+		ProjectID: p.ID, Name: "Admin", Username: "admin-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register admin failed: %v", err)
+	}
+	member, err := authSvc.Register(context.Background(), RegisterInput{
+		ProjectID: p.ID, Name: "Member", Username: "member-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register member failed: %v", err)
+	}
+
+	caller := roleassign.Caller{UserID: admin.ID, ProjectID: p.ID, Role: admin.RoleName}
+	_, err = userSvc.SetRole(context.Background(), caller, member.ID, "superadmin")
+	if err == nil {
+		t.Fatal("expected error for invalid role name, got nil")
+	}
+}
+
 func TestUserService_SetRole_CrossProjectForbidden(t *testing.T) {
 	userSvc, authSvc, projectSvc := newTestUserService(t)
 
