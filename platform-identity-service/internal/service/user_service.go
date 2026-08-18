@@ -47,6 +47,18 @@ func (s *UserService) Get(ctx context.Context, caller roleassign.Caller, userID 
 	return target, nil
 }
 
+// ListAll returns every user across every project. Unlike the other
+// UserService methods, this check does not go through the injected
+// RoleAssigner — there is no single target project to test CanAssign
+// against, since "give me everything" is a different shape of question
+// than "can I act on this one project/user."
+func (s *UserService) ListAll(ctx context.Context, caller roleassign.Caller) ([]models.User, error) {
+	if caller.Role != models.RoleSuperadmin {
+		return nil, ErrForbidden
+	}
+	return s.repo.ListAll(ctx)
+}
+
 // ListByProject returns every user in projectID. Caller must be an admin
 // within that same project — reuses the same RoleAssigner check as SetRole,
 // with the project itself as the target (UserID is irrelevant to CanAssign).

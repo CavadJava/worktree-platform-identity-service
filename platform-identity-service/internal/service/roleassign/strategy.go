@@ -32,3 +32,22 @@ func NewSameProjectAdmin() *SameProjectAdmin {
 func (s *SameProjectAdmin) CanAssign(caller Caller, target Target) bool {
 	return caller.Role == models.RoleAdmin && caller.ProjectID != "" && caller.ProjectID == target.ProjectID
 }
+
+// SuperadminOrSameProjectAdmin extends SameProjectAdmin's rule with a
+// system-level bypass: a superadmin may act on any user in any project.
+// It composes SameProjectAdmin rather than duplicating its condition, so
+// the two rules can never drift apart.
+type SuperadminOrSameProjectAdmin struct {
+	sameProjectAdmin *SameProjectAdmin
+}
+
+func NewSuperadminOrSameProjectAdmin() *SuperadminOrSameProjectAdmin {
+	return &SuperadminOrSameProjectAdmin{sameProjectAdmin: NewSameProjectAdmin()}
+}
+
+func (s *SuperadminOrSameProjectAdmin) CanAssign(caller Caller, target Target) bool {
+	if caller.Role == models.RoleSuperadmin {
+		return true
+	}
+	return s.sameProjectAdmin.CanAssign(caller, target)
+}

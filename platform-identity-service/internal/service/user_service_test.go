@@ -101,6 +101,47 @@ func TestUserService_SetRole_InvalidRoleNameRejected(t *testing.T) {
 	}
 }
 
+func TestUserService_ListAll_SuperadminSucceeds(t *testing.T) {
+	userSvc, authSvc, projectSvc := newTestUserService(t)
+
+	p, _ := projectSvc.Create(context.Background(), "ListAll Success "+uuid.NewString())
+	_, err := authSvc.Register(context.Background(), RegisterInput{
+		ProjectID: p.ID, Name: "Member", Username: "listall-member-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register member failed: %v", err)
+	}
+
+	superadminCaller := roleassign.Caller{UserID: "superadmin-id", ProjectID: "", Role: "superadmin"}
+	users, err := userSvc.ListAll(context.Background(), superadminCaller)
+	if err != nil {
+		t.Fatalf("ListAll failed: %v", err)
+	}
+	if len(users) == 0 {
+		t.Error("expected at least one user in ListAll result")
+	}
+}
+
+func TestUserService_ListAll_NonSuperadminForbidden(t *testing.T) {
+	userSvc, authSvc, projectSvc := newTestUserService(t)
+
+	p, _ := projectSvc.Create(context.Background(), "ListAll Forbidden "+uuid.NewString())
+	admin, err := authSvc.Register(context.Background(), RegisterInput{
+		ProjectID: p.ID, Name: "Admin", Username: "listall-admin-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register admin failed: %v", err)
+	}
+
+	adminCaller := roleassign.Caller{UserID: admin.ID, ProjectID: p.ID, Role: admin.RoleName}
+	_, err = userSvc.ListAll(context.Background(), adminCaller)
+	if err != ErrForbidden {
+		t.Errorf("expected ErrForbidden for non-superadmin caller, got %v", err)
+	}
+}
+
 func TestUserService_ListByProject_SameProjectAdminSucceeds(t *testing.T) {
 	userSvc, authSvc, projectSvc := newTestUserService(t)
 
