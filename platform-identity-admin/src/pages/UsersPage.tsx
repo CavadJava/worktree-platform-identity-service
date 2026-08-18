@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Select, Space, Table, message } from 'antd';
+import { Button, Select, Space, Table, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { User } from '../api/types';
 import { listProjects } from '../api/projects';
@@ -16,6 +16,7 @@ export function UsersPage() {
   });
 
   const effectiveProjectId = selectedProjectId ?? projects?.[0]?.id ?? null;
+  const effectiveProjectName = projects?.find((p) => p.id === effectiveProjectId)?.name ?? null;
 
   const {
     data: users,
@@ -76,6 +77,11 @@ export function UsersPage() {
         onChange={(value) => setSelectedProjectId(value)}
         options={projects?.map((p) => ({ label: p.name, value: p.id }))}
       />
+      {effectiveProjectName && (
+        <Typography.Title level={5} style={{ marginBottom: 12 }}>
+          {effectiveProjectName}
+        </Typography.Title>
+      )}
       <Table rowKey="id" loading={usersLoading} dataSource={users} columns={columns} />
     </>
   );
