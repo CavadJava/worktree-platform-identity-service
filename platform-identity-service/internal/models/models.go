@@ -5,8 +5,9 @@ import "time"
 // Role name constants — single source of truth for the two role names
 // used across handlers, services, and authorization strategies.
 const (
-	RoleUser  = "user"
-	RoleAdmin = "admin"
+	RoleUser       = "user"
+	RoleAdmin      = "admin"
+	RoleSuperadmin = "superadmin"
 )
 
 type Project struct {
@@ -29,6 +30,7 @@ type User struct {
 	ProjectID    *string
 	RoleID       *int16
 	RoleName     string // populated by joined queries, not persisted directly
+	ProjectName  string // populated only by UserRepository.ListAll, empty elsewhere
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

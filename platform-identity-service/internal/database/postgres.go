@@ -44,7 +44,7 @@ func Migrate(db *sql.DB) error {
 			name TEXT UNIQUE NOT NULL
 		);
 
-		INSERT INTO roles (id, name) VALUES (1, 'user'), (2, 'admin')
+		INSERT INTO roles (id, name) VALUES (1, 'user'), (2, 'admin'), (3, 'superadmin')
 		ON CONFLICT (id) DO NOTHING;
 
 		CREATE TABLE IF NOT EXISTS users (
@@ -63,6 +63,22 @@ func Migrate(db *sql.DB) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("migrate: %w", err)
+	}
+	return nil
+}
+
+// SeedSuperadmin ensures exactly one bootstrap superadmin account exists,
+// with no project (system-level). Idempotent: safe to call on every
+// startup. passwordHash must already be bcrypt-hashed by the caller —
+// hashing is not this package's concern, it only persists what it's given.
+func SeedSuperadmin(db *sql.DB, id, username, passwordHash string) error {
+	_, err := db.Exec(`
+		INSERT INTO users (id, name, username, email, password_hash, project_id, role_id, created_at, updated_at)
+		VALUES ($1, 'Superadmin', $2, $2 || '@platform-identity.local', $3, NULL, 3, now(), now())
+		ON CONFLICT (username) DO NOTHING
+	`, id, username, passwordHash)
+	if err != nil {
+		return fmt.Errorf("seed superadmin: %w", err)
 	}
 	return nil
 }
