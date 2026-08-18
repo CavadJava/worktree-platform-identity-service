@@ -7,7 +7,9 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"platform-identity-service/internal/auth"
 	"platform-identity-service/internal/database"
+	"platform-identity-service/internal/repository"
 )
 
 func testDB(t *testing.T) *sql.DB {
@@ -25,4 +27,10 @@ func testDB(t *testing.T) *sql.DB {
 	}
 	t.Cleanup(func() { db.Close() })
 	return db
+}
+
+func newAuthAndProjectServiceFromRepos(t *testing.T, projectRepo *repository.ProjectRepository, userRepo *repository.UserRepository) (*AuthService, *ProjectService) {
+	t.Helper()
+	jwt := auth.NewJWTManager("test-secret", 60)
+	return NewAuthService(projectRepo, userRepo, jwt), NewProjectService(projectRepo)
 }
