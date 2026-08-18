@@ -1,0 +1,15 @@
+[Unit]
+Description=Platform Identity Service
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/opt/platform-identity-service
+EnvironmentFile=/opt/platform-identity-service/.env
+ExecStart=/opt/platform-identity-service/platform-identity-service
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
