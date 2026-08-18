@@ -1,8 +1,7 @@
-import { useState } from 'react';
-import { Button, Select, Space, Table, Typography, message } from 'antd';
+import { Button, Space, Table, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { User } from '../api/types';
-import { listProjects } from '../api/projects';
+import { getProject } from '../api/projects';
 import { listAllUsers, listUsersByProject, setUserRole } from '../api/users';
 import { useAuth } from '../auth/AuthContext';
 import { useQueryErrorToast } from '../hooks/useQueryErrorToast';
@@ -11,16 +10,20 @@ export function UsersPage() {
   const { claims } = useAuth();
   const isSuperadmin = claims?.role === 'superadmin';
   const queryClient = useQueryClient();
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
-  const { data: projects, isLoading: projectsLoading } = useQuery({
-    queryKey: ['projects'],
-    queryFn: () => listProjects(),
-    enabled: !isSuperadmin,
+  // A regular admin's project comes from their own JWT, not a picker —
+  // they were never allowed to see another project's users anyway
+  // (GET /projects/{id}/users 403s for any project but their own), so a
+  // dropdown fed by GET /projects (which lists every project, since that
+  // endpoint has no per-admin scoping) only ever showed choices that would
+  // fail on selection. Fixed by dropping the dropdown for non-superadmins.
+  const ownProjectId = claims?.project_id ?? null;
+
+  const { data: ownProject } = useQuery({
+    queryKey: ['project', ownProjectId],
+    queryFn: () => getProject(ownProjectId!),
+    enabled: !isSuperadmin && !!ownProjectId,
   });
-
-  const effectiveProjectId = selectedProjectId ?? projects?.[0]?.id ?? null;
-  const effectiveProjectName = projects?.find((p) => p.id === effectiveProjectId)?.name ?? null;
 
   const {
     data: scopedUsers,
@@ -28,9 +31,9 @@ export function UsersPage() {
     isError: scopedIsError,
     error: scopedError,
   } = useQuery({
-    queryKey: ['project-users', effectiveProjectId],
-    queryFn: () => listUsersByProject(effectiveProjectId!),
-    enabled: !isSuperadmin && !!effectiveProjectId,
+    queryKey: ['project-users', ownProjectId],
+    queryFn: () => listUsersByProject(ownProjectId!),
+    enabled: !isSuperadmin && !!ownProjectId,
   });
 
   const {
@@ -56,7 +59,7 @@ export function UsersPage() {
       if (isSuperadmin) {
         queryClient.invalidateQueries({ queryKey: ['all-users'] });
       } else {
-        queryClient.invalidateQueries({ queryKey: ['project-users', effectiveProjectId] });
+        queryClient.invalidateQueries({ queryKey: ['project-users', ownProjectId] });
       }
     },
     onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
@@ -97,17 +100,9 @@ export function UsersPage() {
 
   return (
     <>
-      <Select
-        style={{ width: 320, marginBottom: 16 }}
-        placeholder="Layihə seç"
-        loading={projectsLoading}
-        value={effectiveProjectId ?? undefined}
-        onChange={(value) => setSelectedProjectId(value)}
-        options={projects?.map((p) => ({ label: p.name, value: p.id }))}
-      />
-      {effectiveProjectName && (
+      {ownProject && (
         <Typography.Title level={5} style={{ marginBottom: 12 }}>
-          {effectiveProjectName}
+          {ownProject.name}
         </Typography.Title>
       )}
       <Table rowKey="id" loading={usersLoading} dataSource={users} columns={columns} />

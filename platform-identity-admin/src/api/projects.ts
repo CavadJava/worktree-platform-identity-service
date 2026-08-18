@@ -10,3 +10,8 @@ export async function createProject(name: string): Promise<Project> {
   const response = await platformIdentityApi.post<Project>('/projects', { name });
   return response.data;
 }
+
+export async function getProject(id: string): Promise<Project> {
+  const response = await platformIdentityApi.get<Project>(`/projects/${id}`);
+  return response.data;
+}
