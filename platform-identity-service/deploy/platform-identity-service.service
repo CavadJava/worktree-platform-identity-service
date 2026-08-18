@@ -4,7 +4,7 @@ After=network.target postgresql.service
 
 [Service]
 Type=simple
-User=%i
+User=platform-identity-service
 WorkingDirectory=/opt/platform-identity-service
 EnvironmentFile=/opt/platform-identity-service/.env
 ExecStart=/opt/platform-identity-service/platform-identity-service
