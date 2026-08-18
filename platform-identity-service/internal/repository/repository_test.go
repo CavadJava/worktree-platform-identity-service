@@ -200,3 +200,27 @@ func TestUserRepository_GetByUsernameOrEmail(t *testing.T) {
 		t.Errorf("expected ErrUserNotFound, got %v", err)
 	}
 }
+
+func TestRoleRepository_List(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	repo := NewRoleRepository(db)
+
+	roles, err := repo.List(context.Background())
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(roles) != 2 {
+		t.Fatalf("expected 2 seeded roles, got %d", len(roles))
+	}
+	byName := map[string]int16{}
+	for _, r := range roles {
+		byName[r.Name] = r.ID
+	}
+	if byName["user"] != 1 {
+		t.Errorf("expected 'user' role id 1, got %d", byName["user"])
+	}
+	if byName["admin"] != 2 {
+		t.Errorf("expected 'admin' role id 2, got %d", byName["admin"])
+	}
+}

@@ -46,15 +46,18 @@ func main() {
 
 	projectRepo := repository.NewProjectRepository(db)
 	userRepo := repository.NewUserRepository(db)
+	roleRepo := repository.NewRoleRepository(db)
 	jwtManager := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTTTLMinutes)
 
 	projectService := service.NewProjectService(projectRepo)
 	authService := service.NewAuthService(projectRepo, userRepo, jwtManager)
 	userService := service.NewUserService(userRepo, roleassign.NewSameProjectAdmin())
+	roleService := service.NewRoleService(roleRepo)
 
 	projectHandler := handlers.NewProjectHandler(projectService)
 	authHandler := handlers.NewAuthHandler(authService)
 	userHandler := handlers.NewUserHandler(userService)
+	roleHandler := handlers.NewRoleHandler(roleService)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -78,6 +81,7 @@ func main() {
 		r.Post("/projects", projectHandler.Create)
 		r.Get("/projects", projectHandler.List)
 		r.Get("/projects/{id}", projectHandler.Get)
+		r.Get("/roles", roleHandler.List)
 
 		r.Post("/auth/register", authHandler.Register)
 		r.Post("/auth/login", authHandler.Login)
