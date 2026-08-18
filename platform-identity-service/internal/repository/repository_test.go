@@ -137,3 +137,66 @@ func TestUserRepository_SetRole(t *testing.T) {
 		t.Errorf("expected role promoted to admin, got %q", got.RoleName)
 	}
 }
+
+func TestUserRepository_GetByUsernameOrEmail(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	projectRepo := NewProjectRepository(db)
+	userRepo := NewUserRepository(db)
+
+	// Create a test project
+	p := &models.Project{ID: uuid.NewString(), Name: "GetByUsernameOrEmail Test", CreatedAt: time.Now().UTC()}
+	if err := projectRepo.Create(context.Background(), p); err != nil {
+		t.Fatalf("Create project failed: %v", err)
+	}
+
+	// Create a test user
+	roleID := int16(2) // admin
+	testUsername := "testuser-" + uuid.NewString()
+	testEmail := uuid.NewString() + "@example.com"
+	u := &models.User{
+		ID: uuid.NewString(), Name: "Test User", Username: testUsername,
+		Email: testEmail, PasswordHash: "hash",
+		ProjectID: &p.ID, RoleID: &roleID,
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if err := userRepo.Create(context.Background(), u); err != nil {
+		t.Fatalf("Create user failed: %v", err)
+	}
+
+	// Test 1: Find by username
+	got, err := userRepo.GetByUsernameOrEmail(context.Background(), testUsername)
+	if err != nil {
+		t.Fatalf("GetByUsernameOrEmail with username failed: %v", err)
+	}
+	if got.ID != u.ID {
+		t.Errorf("expected user ID %q, got %q", u.ID, got.ID)
+	}
+	if got.Username != testUsername {
+		t.Errorf("expected username %q, got %q", testUsername, got.Username)
+	}
+	if got.RoleName != "admin" {
+		t.Errorf("expected RoleName 'admin', got %q", got.RoleName)
+	}
+
+	// Test 2: Find by email
+	got, err = userRepo.GetByUsernameOrEmail(context.Background(), testEmail)
+	if err != nil {
+		t.Fatalf("GetByUsernameOrEmail with email failed: %v", err)
+	}
+	if got.ID != u.ID {
+		t.Errorf("expected user ID %q, got %q", u.ID, got.ID)
+	}
+	if got.Email != testEmail {
+		t.Errorf("expected email %q, got %q", testEmail, got.Email)
+	}
+	if got.RoleName != "admin" {
+		t.Errorf("expected RoleName 'admin', got %q", got.RoleName)
+	}
+
+	// Test 3: Nonexistent identifier should return ErrUserNotFound
+	_, err = userRepo.GetByUsernameOrEmail(context.Background(), "nonexistent-"+uuid.NewString())
+	if err != ErrUserNotFound {
+		t.Errorf("expected ErrUserNotFound, got %v", err)
+	}
+}
