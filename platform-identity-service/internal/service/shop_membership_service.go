@@ -27,10 +27,11 @@ type ShopMembershipService struct {
 	membershipRepo *repository.ShopMembershipRepository
 	userRepo       *repository.UserRepository
 	shopRepo       *repository.ShopRepository
+	authSvc        *AuthService
 }
 
-func NewShopMembershipService(membershipRepo *repository.ShopMembershipRepository, userRepo *repository.UserRepository, shopRepo *repository.ShopRepository) *ShopMembershipService {
-	return &ShopMembershipService{membershipRepo: membershipRepo, userRepo: userRepo, shopRepo: shopRepo}
+func NewShopMembershipService(membershipRepo *repository.ShopMembershipRepository, userRepo *repository.UserRepository, shopRepo *repository.ShopRepository, authSvc *AuthService) *ShopMembershipService {
+	return &ShopMembershipService{membershipRepo: membershipRepo, userRepo: userRepo, shopRepo: shopRepo, authSvc: authSvc}
 }
 
 // authorize fetches caller's own membership row for shopID (nil if none)
@@ -84,6 +85,35 @@ func (s *ShopMembershipService) AddMember(ctx context.Context, caller shopassign
 		return nil, err
 	}
 	return s.membershipRepo.GetByUserAndShop(ctx, targetUserID, shopID)
+}
+
+// AddNewMember creates a brand-new Teslahubs account (system role 'user',
+// same as self-service Register) and immediately adds it to shopID as
+// shop-user — a shop's own shop-admin uses this to onboard someone who
+// doesn't have an account yet, without needing a separate registration
+// step or knowing the person's user id in advance.
+func (s *ShopMembershipService) AddNewMember(ctx context.Context, caller shopassign.Caller, shopID string, in CreateUserInput) (*models.ShopMembership, error) {
+	if err := s.authorize(ctx, caller, shopID); err != nil {
+		return nil, err
+	}
+
+	in.SystemRole = models.SystemRoleUser
+	u, err := s.authSvc.CreateUser(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+
+	m := &models.ShopMembership{
+		ID:         uuid.NewString(),
+		UserID:     u.ID,
+		ShopID:     shopID,
+		ShopRoleID: shopRoleNameToID[models.ShopRoleUser],
+		CreatedAt:  time.Now().UTC(),
+	}
+	if err := s.membershipRepo.Create(ctx, m); err != nil {
+		return nil, err
+	}
+	return s.membershipRepo.GetByUserAndShop(ctx, u.ID, shopID)
 }
 
 func (s *ShopMembershipService) ListMembers(ctx context.Context, caller shopassign.Caller, shopID string) ([]models.ShopMembership, error) {

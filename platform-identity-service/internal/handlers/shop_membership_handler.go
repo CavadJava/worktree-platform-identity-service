@@ -81,6 +81,62 @@ func (h *ShopMembershipHandler) AddMember(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusCreated, toMemberResponse(m))
 }
 
+type addNewMemberRequest struct {
+	Name     string `json:"name"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// AddNewMember godoc
+// @Summary      Create a brand-new user and add them to a shop as shop-user
+// @Description  Caller must be superadmin or that shop's own shop-admin.
+// @Tags         shops
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Shop ID"
+// @Param        request body addNewMemberRequest true "New member payload"
+// @Success      201 {object} memberResponse
+// @Failure      400 {object} map[string]string
+// @Failure      403 {object} map[string]string
+// @Failure      409 {object} map[string]string
+// @Router       /shops/{id}/members/new [post]
+func (h *ShopMembershipHandler) AddNewMember(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req addNewMemberRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Username == "" || req.Email == "" || req.Password == "" {
+		writeError(w, http.StatusBadRequest, "username, email and password are required")
+		return
+	}
+
+	shopID := chi.URLParam(r, "id")
+	m, err := h.svc.AddNewMember(r.Context(), caller, shopID, service.CreateUserInput{
+		Name: req.Name, Username: req.Username, Email: req.Email, Password: req.Password,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrUsernameTaken):
+			writeError(w, http.StatusConflict, "username already registered")
+		case errors.Is(err, service.ErrEmailTaken):
+			writeError(w, http.StatusConflict, "email already registered")
+		default:
+			writeMembershipError(w, err)
+		}
+		return
+	}
+	writeJSON(w, http.StatusCreated, toMemberResponse(m))
+}
+
 // ListMembers godoc
 // @Summary      List a shop's members
 // @Tags         shops

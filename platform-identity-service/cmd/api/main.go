@@ -64,7 +64,7 @@ func main() {
 	authService := service.NewAuthService(userRepo, jwtManager)
 	userService := service.NewUserService(userRepo)
 	shopService := service.NewShopService(shopRepo)
-	membershipService := service.NewShopMembershipService(membershipRepo, userRepo, shopRepo)
+	membershipService := service.NewShopMembershipService(membershipRepo, userRepo, shopRepo, authService)
 	productService := service.NewProductService(productRepo, subscriptionRepo)
 	systemRoleService := service.NewSystemRoleService(systemRoleRepo)
 	shopRoleService := service.NewShopRoleService(shopRoleRepo)
@@ -111,11 +111,13 @@ func main() {
 
 			r.Get("/users/{id}", userHandler.Get)
 			r.Get("/users", userHandler.ListAll)
+			r.Post("/users", authHandler.CreateUser)
 			r.Post("/users/{id}/system-role", userHandler.SetSystemRole)
 			r.Post("/users/{id}/status", userHandler.SetStatus)
 			r.Get("/users/{id}/shops", userHandler.ListMyShops)
 
 			r.Post("/shops/{id}/members", membershipHandler.AddMember)
+			r.Post("/shops/{id}/members/new", membershipHandler.AddNewMember)
 			r.Get("/shops/{id}/members", membershipHandler.ListMembers)
 			r.Post("/shops/{id}/members/{userId}/role", membershipHandler.SetMemberRole)
 

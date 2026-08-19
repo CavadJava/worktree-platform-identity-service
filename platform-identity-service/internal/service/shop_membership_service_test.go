@@ -20,7 +20,7 @@ func newTestShopMembershipService(t *testing.T) (*ShopMembershipService, *AuthSe
 	jwtMgr := newTestJWTManager()
 	authSvc := NewAuthService(userRepo, jwtMgr)
 	shopSvc := NewShopService(shopRepo)
-	membershipSvc := NewShopMembershipService(membershipRepo, userRepo, shopRepo)
+	membershipSvc := NewShopMembershipService(membershipRepo, userRepo, shopRepo, authSvc)
 	return membershipSvc, authSvc, shopSvc
 }
 
@@ -81,6 +81,59 @@ func TestShopMembershipService_AddMember_ByShopAdmin(t *testing.T) {
 	}
 	if membership.ShopRoleName != models.ShopRoleUser {
 		t.Errorf("expected shop-user, got %q", membership.ShopRoleName)
+	}
+}
+
+func TestShopMembershipService_AddNewMember_ByShopAdmin(t *testing.T) {
+	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
+
+	shop, err := shopSvc.Create(context.Background(), "ShopAdmin AddNew Test "+uuid.NewString())
+	if err != nil {
+		t.Fatalf("create shop failed: %v", err)
+	}
+	shopAdmin, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "ShopAdmin", Username: "shopadmin-new-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register shopAdmin failed: %v", err)
+	}
+	superadminCaller := shopassign.Caller{UserID: "superadmin-id", SystemRole: models.SystemRoleSuperadmin}
+	if _, err := membershipSvc.AddMember(context.Background(), superadminCaller, shop.ID, shopAdmin.ID, models.ShopRoleAdmin); err != nil {
+		t.Fatalf("bootstrap AddMember failed: %v", err)
+	}
+
+	shopAdminCaller := shopassign.Caller{UserID: shopAdmin.ID, SystemRole: models.SystemRoleUser}
+	membership, err := membershipSvc.AddNewMember(context.Background(), shopAdminCaller, shop.ID, CreateUserInput{
+		Name: "Fresh", Username: "fresh-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("AddNewMember failed: %v", err)
+	}
+	if membership.ShopRoleName != models.ShopRoleUser {
+		t.Errorf("expected shop-user, got %q", membership.ShopRoleName)
+	}
+}
+
+func TestShopMembershipService_AddNewMember_ForbiddenForNonMember(t *testing.T) {
+	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
+
+	shop, err := shopSvc.Create(context.Background(), "AddNewMember Forbidden Test "+uuid.NewString())
+	if err != nil {
+		t.Fatalf("create shop failed: %v", err)
+	}
+	caller, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Nobody", Username: "nobody-new-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register caller failed: %v", err)
+	}
+
+	plainCaller := shopassign.Caller{UserID: caller.ID, SystemRole: models.SystemRoleUser}
+	_, err = membershipSvc.AddNewMember(context.Background(), plainCaller, shop.ID, CreateUserInput{
+		Name: "New", Username: "new-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != ErrForbidden {
+		t.Errorf("expected ErrForbidden, got %v", err)
 	}
 }
 

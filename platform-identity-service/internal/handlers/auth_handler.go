@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 
+	"platform-identity-service/internal/middleware"
+	"platform-identity-service/internal/models"
 	"platform-identity-service/internal/service"
 )
 
@@ -65,6 +67,73 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, "email already registered")
 		default:
 			writeError(w, http.StatusInternalServerError, "failed to register user")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, userResponse{
+		ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email,
+		SystemRole: u.SystemRoleName, Status: u.Status,
+	})
+}
+
+type createUserRequest struct {
+	Name       string `json:"name"`
+	Username   string `json:"username"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	SystemRole string `json:"system_role"`
+}
+
+// CreateUser godoc
+// @Summary      Create a Teslahubs account with a chosen system role
+// @Description  Yalnız superadmin çağıra bilər. Adi /auth/register-dən fərqli olaraq, system_role sahəsini qəbul edir.
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request body createUserRequest true "User payload"
+// @Success      201 {object} userResponse
+// @Failure      400 {object} map[string]string
+// @Failure      403 {object} map[string]string
+// @Failure      409 {object} map[string]string
+// @Router       /users [post]
+func (h *AuthHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if caller.SystemRole != models.SystemRoleSuperadmin {
+		writeError(w, http.StatusForbidden, "superadmin role required")
+		return
+	}
+
+	var req createUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Username == "" || req.Email == "" || req.Password == "" {
+		writeError(w, http.StatusBadRequest, "username, email and password are required")
+		return
+	}
+	if req.SystemRole != models.SystemRoleSuperadmin && req.SystemRole != models.SystemRoleAdmin && req.SystemRole != models.SystemRoleUser {
+		writeError(w, http.StatusBadRequest, "system_role must be 'superadmin', 'admin', or 'user'")
+		return
+	}
+
+	u, err := h.svc.CreateUser(r.Context(), service.CreateUserInput{
+		Name: req.Name, Username: req.Username, Email: req.Email, Password: req.Password, SystemRole: req.SystemRole,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrUsernameTaken):
+			writeError(w, http.StatusConflict, "username already registered")
+		case errors.Is(err, service.ErrEmailTaken):
+			writeError(w, http.StatusConflict, "email already registered")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to create user")
 		}
 		return
 	}

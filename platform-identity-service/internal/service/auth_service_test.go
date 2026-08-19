@@ -10,6 +10,35 @@ import (
 	"platform-identity-service/internal/repository"
 )
 
+func TestAuthService_CreateUser_HonorsSpecifiedSystemRole(t *testing.T) {
+	authSvc := newTestAuthService(t)
+
+	u, err := authSvc.CreateUser(context.Background(), CreateUserInput{
+		Name: "Made Admin", Username: "made-admin-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", Password: "password123",
+		SystemRole: models.SystemRoleAdmin,
+	})
+	if err != nil {
+		t.Fatalf("CreateUser failed: %v", err)
+	}
+	if u.SystemRoleName != models.SystemRoleAdmin {
+		t.Errorf("expected system role 'admin', got %q", u.SystemRoleName)
+	}
+}
+
+func TestAuthService_CreateUser_InvalidSystemRole(t *testing.T) {
+	authSvc := newTestAuthService(t)
+
+	_, err := authSvc.CreateUser(context.Background(), CreateUserInput{
+		Name: "Bad Role", Username: "bad-role-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", Password: "password123",
+		SystemRole: "not-a-real-role",
+	})
+	if err != ErrInvalidSystemRole {
+		t.Errorf("expected ErrInvalidSystemRole, got %v", err)
+	}
+}
+
 func TestAuthService_Register_AlwaysCreatesPlainUser(t *testing.T) {
 	authSvc := newTestAuthService(t)
 

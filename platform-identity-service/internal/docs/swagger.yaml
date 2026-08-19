@@ -12,6 +12,17 @@ definitions:
       user_id:
         type: string
     type: object
+  handlers.addNewMemberRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    type: object
   handlers.createProductRequest:
     properties:
       name:
@@ -20,6 +31,19 @@ definitions:
   handlers.createShopRequest:
     properties:
       name:
+        type: string
+    type: object
+  handlers.createUserRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      system_role:
+        type: string
+      username:
         type: string
     type: object
   handlers.loginRequest:
@@ -467,6 +491,53 @@ paths:
       summary: Change a member's shop role
       tags:
       - shops
+  /shops/{id}/members/new:
+    post:
+      consumes:
+      - application/json
+      description: Caller must be superadmin or that shop's own shop-admin.
+      parameters:
+      - description: Shop ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New member payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.addNewMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.memberResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a brand-new user and add them to a shop as shop-user
+      tags:
+      - shops
   /system-roles:
     get:
       produces:
@@ -502,6 +573,48 @@ paths:
       security:
       - BearerAuth: []
       summary: List every Teslahubs user
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: Yalnız superadmin çağıra bilər. Adi /auth/register-dən fərqli olaraq,
+        system_role sahəsini qəbul edir.
+      parameters:
+      - description: User payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.userResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a Teslahubs account with a chosen system role
       tags:
       - users
   /users/{id}:
@@ -640,7 +753,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Superadmin or admin only. No payment gateway integration.
+      description: Superadmin only. No payment gateway integration.
       parameters:
       - description: User ID
         in: path

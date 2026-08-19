@@ -65,6 +65,51 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*models.U
 	return s.userRepo.GetByID(ctx, u.ID)
 }
 
+// CreateUser is the superadmin-only counterpart to Register: unlike
+// self-service registration, the caller specifies the new user's system
+// role directly. Authorization (caller must be superadmin) is enforced by
+// the handler via middleware.CallerFromContext before this is called,
+// mirroring how UserService's other superadmin-only methods are gated —
+// this method itself trusts its caller, the same way Register trusts
+// that no role field ever reaches it from the client.
+type CreateUserInput struct {
+	Name       string
+	Username   string
+	Email      string
+	Password   string
+	SystemRole string
+}
+
+func (s *AuthService) CreateUser(ctx context.Context, in CreateUserInput) (*models.User, error) {
+	roleID, ok := systemRoleNameToID[in.SystemRole]
+	if !ok {
+		return nil, ErrInvalidSystemRole
+	}
+
+	hash, err := auth.HashPassword(in.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	u := &models.User{
+		ID:           uuid.NewString(),
+		Name:         in.Name,
+		Username:     in.Username,
+		Email:        in.Email,
+		PasswordHash: hash,
+		SystemRoleID: roleID,
+		Status:       models.UserStatusActive,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	if err := s.userRepo.Create(ctx, u); err != nil {
+		return nil, err
+	}
+
+	return s.userRepo.GetByID(ctx, u.ID)
+}
+
 type LoginInput struct {
 	Identifier string
 	Password   string
