@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, Card, Form, Input, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../api/auth';
+import { listUserShops } from '../api/users';
 import { useAuth } from '../auth/AuthContext';
 import { decodeToken } from '../auth/jwt';
 
@@ -12,7 +13,7 @@ interface LoginFormValues {
 
 export function LoginPage() {
   const [loading, setLoading] = useState(false);
-  const { login: setToken } = useAuth();
+  const { login: setToken, setMyShop } = useAuth();
   const navigate = useNavigate();
 
   async function onFinish(values: LoginFormValues) {
@@ -20,12 +21,25 @@ export function LoginPage() {
     try {
       const { token } = await login(values.identifier, values.password);
       const claims = decodeToken(token);
-      if (claims.system_role !== 'admin' && claims.system_role !== 'superadmin') {
-        message.error('Yalnız admin və ya superadmin rolunda olan istifadəçilər giriş edə bilər');
+
+      if (claims.system_role === 'admin' || claims.system_role === 'superadmin') {
+        setToken(token);
+        navigate('/shops');
         return;
       }
+
+      // Not a system-level admin — check if they're a shop-admin or
+      // shop-user of at least one shop, which also earns panel access
+      // (scoped to just that shop's members page).
+      const memberships = await listUserShops(claims.user_id);
+      if (memberships.length === 0) {
+        message.error('Yalnız admin, superadmin, ya da bir mağazanın üzvü olan istifadəçilər giriş edə bilər');
+        return;
+      }
+
       setToken(token);
-      navigate('/shops');
+      setMyShop(memberships[0].shop_id, memberships[0].shop_role);
+      navigate(`/shops/${memberships[0].shop_id}/members`);
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Login uğursuz oldu');
     } finally {

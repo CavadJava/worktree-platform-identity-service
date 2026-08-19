@@ -6,6 +6,7 @@ import type { Member } from '../api/types';
 import { getShop } from '../api/shops';
 import { listShopRoles } from '../api/systemRoles';
 import { addNewShopMember, addShopMember, listAllUsers, listShopMembers, setMemberRole } from '../api/users';
+import { useAuth } from '../auth/AuthContext';
 import { useQueryErrorToast } from '../hooks/useQueryErrorToast';
 
 interface NewMemberFormValues {
@@ -17,6 +18,11 @@ interface NewMemberFormValues {
 
 export function ShopMembersPage() {
   const { id: shopId } = useParams<{ id: string }>();
+  const { claims } = useAuth();
+  // GET /users (used to populate the "existing user" picker) is
+  // superadmin-only server-side — a shop-admin can still add brand-new
+  // members via AddNewMember, just not pick from every Teslahubs user.
+  const isSystemAdmin = claims?.system_role === 'admin' || claims?.system_role === 'superadmin';
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -34,7 +40,11 @@ export function ShopMembersPage() {
   } = useQuery({ queryKey: ['shop-members', shopId], queryFn: () => listShopMembers(shopId!), enabled: !!shopId });
   useQueryErrorToast(isError, error);
 
-  const { data: allUsers } = useQuery({ queryKey: ['all-users-for-add'], queryFn: () => listAllUsers(), enabled: modalOpen });
+  const { data: allUsers } = useQuery({
+    queryKey: ['all-users-for-add'],
+    queryFn: () => listAllUsers(),
+    enabled: modalOpen && isSystemAdmin,
+  });
   const { data: shopRoles } = useQuery({ queryKey: ['shop-roles'], queryFn: () => listShopRoles(), enabled: modalOpen });
 
   const invalidateMembers = () => queryClient.invalidateQueries({ queryKey: ['shop-members', shopId] });
@@ -106,37 +116,41 @@ export function ShopMembersPage() {
         </Typography.Title>
       )}
       <Space style={{ marginBottom: 16 }}>
-        <Button type="primary" onClick={() => setModalOpen(true)}>
-          Mövcud istifadəçi əlavə et
-        </Button>
+        {isSystemAdmin && (
+          <Button type="primary" onClick={() => setModalOpen(true)}>
+            Mövcud istifadəçi əlavə et
+          </Button>
+        )}
         <Button onClick={() => setNewMemberModalOpen(true)}>Yeni istifadəçi əlavə et</Button>
       </Space>
       <Table rowKey="id" loading={membersLoading} dataSource={members} columns={columns} />
-      <Modal
-        title="Mövcud istifadəçi əlavə et"
-        open={modalOpen}
-        onCancel={() => setModalOpen(false)}
-        onOk={() => addMutation.mutate()}
-        confirmLoading={addMutation.isPending}
-        okButtonProps={{ disabled: !selectedUserId || !selectedShopRole }}
-      >
-        <Space direction="vertical" style={{ width: '100%' }}>
-          <Select
-            style={{ width: '100%' }}
-            placeholder="İstifadəçi seç"
-            value={selectedUserId ?? undefined}
-            onChange={setSelectedUserId}
-            options={allUsers?.map((u) => ({ label: `${u.name} (${u.username})`, value: u.id }))}
-          />
-          <Select
-            style={{ width: '100%' }}
-            placeholder="Rol seç"
-            value={selectedShopRole ?? undefined}
-            onChange={setSelectedShopRole}
-            options={shopRoles?.map((r) => ({ label: r.name, value: r.name }))}
-          />
-        </Space>
-      </Modal>
+      {isSystemAdmin && (
+        <Modal
+          title="Mövcud istifadəçi əlavə et"
+          open={modalOpen}
+          onCancel={() => setModalOpen(false)}
+          onOk={() => addMutation.mutate()}
+          confirmLoading={addMutation.isPending}
+          okButtonProps={{ disabled: !selectedUserId || !selectedShopRole }}
+        >
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Select
+              style={{ width: '100%' }}
+              placeholder="İstifadəçi seç"
+              value={selectedUserId ?? undefined}
+              onChange={setSelectedUserId}
+              options={allUsers?.map((u) => ({ label: `${u.name} (${u.username})`, value: u.id }))}
+            />
+            <Select
+              style={{ width: '100%' }}
+              placeholder="Rol seç"
+              value={selectedShopRole ?? undefined}
+              onChange={setSelectedShopRole}
+              options={shopRoles?.map((r) => ({ label: r.name, value: r.name }))}
+            />
+          </Space>
+        </Modal>
+      )}
       <Modal
         title="Yeni istifadəçi əlavə et"
         open={newMemberModalOpen}

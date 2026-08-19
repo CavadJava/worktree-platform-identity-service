@@ -6,16 +6,24 @@ import { useAuth } from '../auth/AuthContext';
 
 const { Sider, Header, Content } = Layout;
 
-const items: MenuProps['items'] = [
-  { key: '/shops', icon: <AppstoreOutlined />, label: 'Shop-lar' },
-  { key: '/products', icon: <ShoppingOutlined />, label: 'Product-lar' },
-  { key: '/users', icon: <TeamOutlined />, label: 'İstifadəçilər' },
-];
-
 export function AppLayout() {
-  const { logout } = useAuth();
+  const { logout, claims, myShopId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const isSystemAdmin = claims?.system_role === 'admin' || claims?.system_role === 'superadmin';
+
+  // A shop-scoped user (no system role) only ever has one page to see —
+  // their own shop's members — so the nav is reduced to just that,
+  // rather than showing Shop-lar/Product-lar/İstifadəçilər they have no
+  // access to anyway.
+  const items: MenuProps['items'] = isSystemAdmin
+    ? [
+        { key: '/shops', icon: <AppstoreOutlined />, label: 'Shop-lar' },
+        { key: '/products', icon: <ShoppingOutlined />, label: 'Product-lar' },
+        { key: '/users', icon: <TeamOutlined />, label: 'İstifadəçilər' },
+      ]
+    : [{ key: `/shops/${myShopId}/members`, icon: <TeamOutlined />, label: 'Mənim mağazam' }];
 
   // Highlight the top-level nav item even on a nested route like
   // /shops/:id/members.
