@@ -20,12 +20,12 @@ export function LoginPage() {
     try {
       const { token } = await login(values.identifier, values.password);
       const claims = decodeToken(token);
-      if (claims.role !== 'admin' && claims.role !== 'superadmin') {
+      if (claims.system_role !== 'admin' && claims.system_role !== 'superadmin') {
         message.error('Yalnız admin və ya superadmin rolunda olan istifadəçilər giriş edə bilər');
         return;
       }
       setToken(token);
-      navigate('/projects');
+      navigate('/shops');
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Login uğursuz oldu');
     } finally {
@@ -35,7 +35,7 @@ export function LoginPage() {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-      <Card title="Platform Identity Admin — Giriş" style={{ width: 360 }}>
+      <Card title="Teslahubs Admin — Giriş" style={{ width: 360 }}>
         <Form layout="vertical" onFinish={onFinish}>
           <Form.Item name="identifier" label="Username və ya Email" rules={[{ required: true }]}>
             <Input />

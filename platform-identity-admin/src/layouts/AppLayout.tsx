@@ -1,14 +1,14 @@
 import { Layout, Menu } from 'antd';
 import type { MenuProps } from 'antd';
-import { AppstoreOutlined, TeamOutlined, TagsOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, ShoppingOutlined, TeamOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
 const { Sider, Header, Content } = Layout;
 
 const items: MenuProps['items'] = [
-  { key: '/projects', icon: <AppstoreOutlined />, label: 'Layihələr' },
-  { key: '/roles', icon: <TagsOutlined />, label: 'Rollar' },
+  { key: '/shops', icon: <AppstoreOutlined />, label: 'Shop-lar' },
+  { key: '/products', icon: <ShoppingOutlined />, label: 'Product-lar' },
   { key: '/users', icon: <TeamOutlined />, label: 'İstifadəçilər' },
 ];
 
@@ -17,14 +17,18 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Highlight the top-level nav item even on a nested route like
+  // /shops/:id/members.
+  const selectedKey = items?.find((item) => item && location.pathname.startsWith(String(item.key)))?.key as string | undefined;
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sider theme="light" width={220}>
-        <div style={{ padding: 16, fontWeight: 600, fontSize: 16 }}>Platform Identity Admin</div>
+        <div style={{ padding: 16, fontWeight: 600, fontSize: 16 }}>Teslahubs Admin</div>
         <Menu
           theme="light"
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={selectedKey ? [selectedKey] : []}
           items={items}
           onClick={({ key }) => navigate(key)}
         />

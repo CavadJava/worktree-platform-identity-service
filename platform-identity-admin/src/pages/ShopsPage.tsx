@@ -1,29 +1,31 @@
 import { useState } from 'react';
-import { Button, Form, Input, Modal, Table } from 'antd';
+import { Button, Form, Input, Modal, Table, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createProject, listProjects } from '../api/projects';
+import { useNavigate } from 'react-router-dom';
+import type { Shop } from '../api/types';
+import { createShop, listShops } from '../api/shops';
 import { useQueryErrorToast } from '../hooks/useQueryErrorToast';
-import { message } from 'antd';
 
-interface ProjectFormValues {
+interface ShopFormValues {
   name: string;
 }
 
-export function ProjectsPage() {
+export function ShopsPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
-  const [form] = Form.useForm<ProjectFormValues>();
+  const [form] = Form.useForm<ShopFormValues>();
 
-  const { data: projects, isLoading, isError, error } = useQuery({ queryKey: ['projects'], queryFn: () => listProjects() });
+  const { data: shops, isLoading, isError, error } = useQuery({ queryKey: ['shops'], queryFn: () => listShops() });
   useQueryErrorToast(isError, error);
 
   const createMutation = useMutation({
-    mutationFn: (values: ProjectFormValues) => createProject(values.name),
+    mutationFn: (values: ShopFormValues) => createShop(values.name),
     onSuccess: () => {
-      message.success('Layihə yaradıldı');
+      message.success('Shop yaradıldı');
       setModalOpen(false);
       form.resetFields();
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['shops'] });
     },
     onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
   });
@@ -32,16 +34,24 @@ export function ProjectsPage() {
     { title: 'Ad', dataIndex: 'name' },
     { title: 'ID', dataIndex: 'id' },
     { title: 'Yaradılma tarixi', dataIndex: 'created_at' },
+    {
+      title: 'Əməliyyat',
+      render: (_: unknown, record: Shop) => (
+        <Button size="small" onClick={() => navigate(`/shops/${record.id}/members`)}>
+          Üzvlər
+        </Button>
+      ),
+    },
   ];
 
   return (
     <>
       <Button type="primary" onClick={() => setModalOpen(true)} style={{ marginBottom: 16 }}>
-        Yeni layihə
+        Yeni shop
       </Button>
-      <Table rowKey="id" loading={isLoading} dataSource={projects} columns={columns} />
+      <Table rowKey="id" loading={isLoading} dataSource={shops} columns={columns} />
       <Modal
-        title="Yeni layihə"
+        title="Yeni shop"
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         onOk={() => form.submit()}
