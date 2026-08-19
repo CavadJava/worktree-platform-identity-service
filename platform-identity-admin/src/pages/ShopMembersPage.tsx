@@ -1,12 +1,19 @@
 import { useState } from 'react';
-import { Button, Modal, Select, Space, Table, Typography, message } from 'antd';
+import { Button, Form, Input, Modal, Select, Space, Table, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import type { Member } from '../api/types';
 import { getShop } from '../api/shops';
 import { listShopRoles } from '../api/systemRoles';
-import { addShopMember, listAllUsers, listShopMembers, setMemberRole } from '../api/users';
+import { addNewShopMember, addShopMember, listAllUsers, listShopMembers, setMemberRole } from '../api/users';
 import { useQueryErrorToast } from '../hooks/useQueryErrorToast';
+
+interface NewMemberFormValues {
+  name: string;
+  username: string;
+  email: string;
+  password: string;
+}
 
 export function ShopMembersPage() {
   const { id: shopId } = useParams<{ id: string }>();
@@ -14,6 +21,8 @@ export function ShopMembersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedShopRole, setSelectedShopRole] = useState<string | null>(null);
+  const [newMemberModalOpen, setNewMemberModalOpen] = useState(false);
+  const [newMemberForm] = Form.useForm<NewMemberFormValues>();
 
   const { data: shop } = useQuery({ queryKey: ['shop', shopId], queryFn: () => getShop(shopId!), enabled: !!shopId });
 
@@ -28,6 +37,8 @@ export function ShopMembersPage() {
   const { data: allUsers } = useQuery({ queryKey: ['all-users-for-add'], queryFn: () => listAllUsers(), enabled: modalOpen });
   const { data: shopRoles } = useQuery({ queryKey: ['shop-roles'], queryFn: () => listShopRoles(), enabled: modalOpen });
 
+  const invalidateMembers = () => queryClient.invalidateQueries({ queryKey: ['shop-members', shopId] });
+
   const addMutation = useMutation({
     mutationFn: () => addShopMember(shopId!, selectedUserId!, selectedShopRole!),
     onSuccess: () => {
@@ -35,7 +46,19 @@ export function ShopMembersPage() {
       setModalOpen(false);
       setSelectedUserId(null);
       setSelectedShopRole(null);
-      queryClient.invalidateQueries({ queryKey: ['shop-members', shopId] });
+      invalidateMembers();
+    },
+    onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
+  });
+
+  const addNewMemberMutation = useMutation({
+    mutationFn: (values: NewMemberFormValues) =>
+      addNewShopMember(shopId!, values.name, values.username, values.email, values.password),
+    onSuccess: () => {
+      message.success('Yeni istifadəçi yaradıldı və üzv edildi');
+      setNewMemberModalOpen(false);
+      newMemberForm.resetFields();
+      invalidateMembers();
     },
     onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
   });
@@ -44,7 +67,7 @@ export function ShopMembersPage() {
     mutationFn: ({ userId, shopRole }: { userId: string; shopRole: string }) => setMemberRole(shopId!, userId, shopRole),
     onSuccess: () => {
       message.success('Rol dəyişdirildi');
-      queryClient.invalidateQueries({ queryKey: ['shop-members', shopId] });
+      invalidateMembers();
     },
     onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
   });
@@ -82,12 +105,15 @@ export function ShopMembersPage() {
           {shop.name} — Üzvlər
         </Typography.Title>
       )}
-      <Button type="primary" onClick={() => setModalOpen(true)} style={{ marginBottom: 16 }}>
-        Üzv əlavə et
-      </Button>
+      <Space style={{ marginBottom: 16 }}>
+        <Button type="primary" onClick={() => setModalOpen(true)}>
+          Mövcud istifadəçi əlavə et
+        </Button>
+        <Button onClick={() => setNewMemberModalOpen(true)}>Yeni istifadəçi əlavə et</Button>
+      </Space>
       <Table rowKey="id" loading={membersLoading} dataSource={members} columns={columns} />
       <Modal
-        title="Üzv əlavə et"
+        title="Mövcud istifadəçi əlavə et"
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         onOk={() => addMutation.mutate()}
@@ -110,6 +136,28 @@ export function ShopMembersPage() {
             options={shopRoles?.map((r) => ({ label: r.name, value: r.name }))}
           />
         </Space>
+      </Modal>
+      <Modal
+        title="Yeni istifadəçi əlavə et"
+        open={newMemberModalOpen}
+        onCancel={() => setNewMemberModalOpen(false)}
+        onOk={() => newMemberForm.submit()}
+        confirmLoading={addNewMemberMutation.isPending}
+      >
+        <Form form={newMemberForm} layout="vertical" onFinish={(values) => addNewMemberMutation.mutate(values)}>
+          <Form.Item name="name" label="Ad" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="username" label="Username" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="password" label="Şifrə" rules={[{ required: true }]}>
+            <Input.Password />
+          </Form.Item>
+        </Form>
       </Modal>
     </>
   );

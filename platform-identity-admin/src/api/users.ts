@@ -11,6 +11,23 @@ export async function getUser(id: string): Promise<User> {
   return response.data;
 }
 
+export async function createUser(
+  name: string,
+  username: string,
+  email: string,
+  password: string,
+  systemRole: string
+): Promise<User> {
+  const response = await platformIdentityApi.post<User>('/users', {
+    name,
+    username,
+    email,
+    password,
+    system_role: systemRole,
+  });
+  return response.data;
+}
+
 export async function setSystemRole(userId: string, systemRole: string): Promise<User> {
   const response = await platformIdentityApi.post<User>(`/users/${userId}/system-role`, { system_role: systemRole });
   return response.data;
@@ -42,6 +59,22 @@ export async function addShopMember(shopId: string, userId: string, shopRole: st
 export async function setMemberRole(shopId: string, userId: string, shopRole: string): Promise<Member> {
   const response = await platformIdentityApi.post<Member>(`/shops/${shopId}/members/${userId}/role`, {
     shop_role: shopRole,
+  });
+  return response.data;
+}
+
+export async function addNewShopMember(
+  shopId: string,
+  name: string,
+  username: string,
+  email: string,
+  password: string
+): Promise<Member> {
+  const response = await platformIdentityApi.post<Member>(`/shops/${shopId}/members/new`, {
+    name,
+    username,
+    email,
+    password,
   });
   return response.data;
 }
