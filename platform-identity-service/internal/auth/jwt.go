@@ -10,9 +10,8 @@ import (
 var ErrInvalidToken = errors.New("invalid or expired token")
 
 type Claims struct {
-	UserID    string `json:"user_id"`
-	ProjectID string `json:"project_id"`
-	Role      string `json:"role"`
+	UserID     string `json:"user_id"`
+	SystemRole string `json:"system_role"`
 	jwt.RegisteredClaims
 }
 
@@ -28,12 +27,11 @@ func NewJWTManager(secret string, ttlMinutes int) *JWTManager {
 	}
 }
 
-func (m *JWTManager) Generate(userID, projectID, role string) (string, time.Time, error) {
+func (m *JWTManager) Generate(userID, systemRole string) (string, time.Time, error) {
 	expiresAt := time.Now().Add(m.ttl)
 	claims := Claims{
-		UserID:    userID,
-		ProjectID: projectID,
-		Role:      role,
+		UserID:     userID,
+		SystemRole: systemRole,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

@@ -2,35 +2,76 @@ package models
 
 import "time"
 
-// Role name constants — single source of truth for the two role names
-// used across handlers, services, and authorization strategies.
 const (
-	RoleUser       = "user"
-	RoleAdmin      = "admin"
-	RoleSuperadmin = "superadmin"
+	SystemRoleSuperadmin = "superadmin"
+	SystemRoleAdmin      = "admin"
+	SystemRoleUser       = "user"
 )
 
-type Project struct {
+const (
+	ShopRoleAdmin = "shop-admin"
+	ShopRoleUser  = "shop-user"
+)
+
+const (
+	UserStatusActive   = "ACTIVE"
+	UserStatusInActive = "IN_ACTIVE"
+)
+
+type Shop struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-type Role struct {
+type SystemRole struct {
+	ID   int16  `json:"id"`
+	Name string `json:"name"`
+}
+
+type ShopRole struct {
 	ID   int16  `json:"id"`
 	Name string `json:"name"`
 }
 
 type User struct {
+	ID             string
+	Name           string
+	Username       string
+	Email          string
+	PasswordHash   string
+	SystemRoleID   int16
+	SystemRoleName string // populated by joined queries
+	Status         string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+// ShopMembership is a row from user_shop_memberships, joined with the
+// shop's name and the shop role's name for direct display — mirrors the
+// old User.RoleName join-only-field precedent.
+type ShopMembership struct {
 	ID           string
-	Name         string
-	Username     string
-	Email        string
-	PasswordHash string
-	ProjectID    *string
-	RoleID       *int16
-	RoleName     string // populated by joined queries, not persisted directly
-	ProjectName  string // populated only by UserRepository.ListAll, empty elsewhere
+	UserID       string
+	ShopID       string
+	ShopName     string
+	ShopRoleID   int16
+	ShopRoleName string
 	CreatedAt    time.Time
-	UpdatedAt    time.Time
+}
+
+type Product struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type Subscription struct {
+	ID          string
+	UserID      string
+	ProductID   string
+	Subscripted bool
+	Renewed     bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }

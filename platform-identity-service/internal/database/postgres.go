@@ -33,33 +33,75 @@ func Connect(cfg *config.Config) (*sql.DB, error) {
 
 func Migrate(db *sql.DB) error {
 	_, err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS projects (
+		DROP TABLE IF EXISTS user_product_subscriptions;
+		DROP TABLE IF EXISTS products;
+		DROP TABLE IF EXISTS user_shop_memberships;
+		DROP TABLE IF EXISTS users;
+		DROP TABLE IF EXISTS shops;
+		DROP TABLE IF EXISTS shop_roles;
+		DROP TABLE IF EXISTS system_roles;
+		DROP TABLE IF EXISTS roles;
+		DROP TABLE IF EXISTS projects;
+
+		CREATE TABLE system_roles (
+			id SMALLSERIAL PRIMARY KEY,
+			name TEXT UNIQUE NOT NULL
+		);
+		INSERT INTO system_roles (id, name) VALUES (1, 'superadmin'), (2, 'admin'), (3, 'user')
+		ON CONFLICT (id) DO NOTHING;
+
+		CREATE TABLE shop_roles (
+			id SMALLSERIAL PRIMARY KEY,
+			name TEXT UNIQUE NOT NULL
+		);
+		INSERT INTO shop_roles (id, name) VALUES (1, 'shop-admin'), (2, 'shop-user')
+		ON CONFLICT (id) DO NOTHING;
+
+		CREATE TABLE shops (
 			id UUID PRIMARY KEY,
 			name TEXT NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
 
-		CREATE TABLE IF NOT EXISTS roles (
-			id SMALLSERIAL PRIMARY KEY,
-			name TEXT UNIQUE NOT NULL
-		);
-
-		INSERT INTO roles (id, name) VALUES (1, 'user'), (2, 'admin'), (3, 'superadmin')
-		ON CONFLICT (id) DO NOTHING;
-
-		CREATE TABLE IF NOT EXISTS users (
+		CREATE TABLE users (
 			id UUID PRIMARY KEY,
 			name TEXT NOT NULL,
 			username TEXT NOT NULL UNIQUE,
 			email TEXT NOT NULL UNIQUE,
 			password_hash TEXT NOT NULL,
-			project_id UUID REFERENCES projects(id),
-			role_id SMALLINT REFERENCES roles(id),
+			system_role_id SMALLINT NOT NULL REFERENCES system_roles(id) DEFAULT 3,
+			status TEXT NOT NULL DEFAULT 'ACTIVE',
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
 
-		CREATE INDEX IF NOT EXISTS idx_users_project_id ON users (project_id);
+		CREATE TABLE user_shop_memberships (
+			id UUID PRIMARY KEY,
+			user_id UUID NOT NULL REFERENCES users(id),
+			shop_id UUID NOT NULL REFERENCES shops(id),
+			shop_role_id SMALLINT NOT NULL REFERENCES shop_roles(id),
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			UNIQUE (user_id, shop_id)
+		);
+		CREATE INDEX idx_memberships_shop_id ON user_shop_memberships (shop_id);
+		CREATE INDEX idx_memberships_user_id ON user_shop_memberships (user_id);
+
+		CREATE TABLE products (
+			id UUID PRIMARY KEY,
+			name TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		);
+
+		CREATE TABLE user_product_subscriptions (
+			id UUID PRIMARY KEY,
+			user_id UUID NOT NULL REFERENCES users(id),
+			product_id UUID NOT NULL REFERENCES products(id),
+			subscripted BOOLEAN NOT NULL DEFAULT false,
+			renewed BOOLEAN NOT NULL DEFAULT false,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			UNIQUE (user_id, product_id)
+		);
 	`)
 	if err != nil {
 		return fmt.Errorf("migrate: %w", err)
@@ -67,14 +109,13 @@ func Migrate(db *sql.DB) error {
 	return nil
 }
 
-// SeedSuperadmin ensures exactly one bootstrap superadmin account exists,
-// with no project (system-level). Idempotent: safe to call on every
-// startup. passwordHash must already be bcrypt-hashed by the caller —
-// hashing is not this package's concern, it only persists what it's given.
+// SeedSuperadmin ensures exactly one bootstrap superadmin account exists.
+// Idempotent: safe to call on every startup. passwordHash must already be
+// bcrypt-hashed by the caller.
 func SeedSuperadmin(db *sql.DB, id, username, passwordHash string) error {
 	_, err := db.Exec(`
-		INSERT INTO users (id, name, username, email, password_hash, project_id, role_id, created_at, updated_at)
-		VALUES ($1, 'Superadmin', $2, $2 || '@platform-identity.local', $3, NULL, 3, now(), now())
+		INSERT INTO users (id, name, username, email, password_hash, system_role_id, status, created_at, updated_at)
+		VALUES ($1, 'Superadmin', $2, $2 || '@platform-identity.local', $3, 1, 'ACTIVE', now(), now())
 		ON CONFLICT (username) DO NOTHING
 	`, id, username, passwordHash)
 	if err != nil {
