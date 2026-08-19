@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -132,8 +133,8 @@ func TestFullFlow_RegisterLoginGetUser(t *testing.T) {
 	}
 }
 
-func TestFullFlow_RegistrationDoesNotCreateShopMembership(t *testing.T) {
-	r, _ := testRouter(t)
+func TestFullFlow_RegistrationCreatesNoShopMembership(t *testing.T) {
+	r, db := testRouter(t)
 
 	username := "noshop-" + uuid.NewString()
 	rec := doJSON(t, r, http.MethodPost, "/api/v1/auth/register", "", map[string]string{
@@ -142,6 +143,12 @@ func TestFullFlow_RegistrationDoesNotCreateShopMembership(t *testing.T) {
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("register: expected 201, got %d: %s", rec.Code, rec.Body.String())
 	}
+	var userEnv struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&userEnv)
 
 	rec = doJSON(t, r, http.MethodPost, "/api/v1/auth/login", "", map[string]string{
 		"identifier": username, "password": "password123",
@@ -152,14 +159,75 @@ func TestFullFlow_RegistrationDoesNotCreateShopMembership(t *testing.T) {
 		} `json:"data"`
 	}
 	json.NewDecoder(rec.Body).Decode(&loginEnv)
-
-	// A plain user (no shop membership, no superadmin) cannot even create
-	// a shop-member-add request that would succeed — confirmed indirectly
-	// by the earlier service-layer tests (TestShopMembershipService_AddMember_ForbiddenForNonMember);
-	// this test just confirms registration itself creates no membership
-	// side effect by checking GET /users/{id} succeeds with system_role
-	// 'user' and nothing shop-related was silently created.
 	if loginEnv.Data.Token == "" {
 		t.Fatal("expected non-empty token")
+	}
+
+	membershipRepo := repository.NewShopMembershipRepository(db)
+	memberships, err := membershipRepo.ListByUser(context.Background(), userEnv.Data.ID)
+	if err != nil {
+		t.Fatalf("list memberships: %v", err)
+	}
+	if len(memberships) != 0 {
+		t.Fatalf("expected registration to create no shop memberships, got %d", len(memberships))
+	}
+}
+
+// TestRequireAuth_RejectsTokenAfterUserDeactivated proves the core point of
+// the RequireAuth rewrite: a user's status is re-checked from the database
+// on every request, not just at login. A token issued while the user was
+// ACTIVE must stop working the moment an admin flips them to IN_ACTIVE,
+// without the user needing to log in again.
+func TestRequireAuth_RejectsTokenAfterUserDeactivated(t *testing.T) {
+	r, db := testRouter(t)
+
+	username := "deactivate-" + uuid.NewString()
+	rec := doJSON(t, r, http.MethodPost, "/api/v1/auth/register", "", map[string]string{
+		"name": "Deactivate Me", "username": username, "email": uuid.NewString() + "@example.com", "password": "password123",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("register: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var userEnv struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&userEnv)
+	userID := userEnv.Data.ID
+
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/auth/login", "", map[string]string{
+		"identifier": username, "password": "password123",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("login: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var loginEnv struct {
+		Data struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&loginEnv)
+	token := loginEnv.Data.Token
+	if token == "" {
+		t.Fatal("expected non-empty token")
+	}
+
+	// Sanity check: the token works while the user is still ACTIVE.
+	rec = doJSON(t, r, http.MethodGet, "/api/v1/users/"+userID, token, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get user while active: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Deactivate the user directly at the repository layer.
+	userRepo := repository.NewUserRepository(db)
+	if err := userRepo.SetStatus(context.Background(), userID, models.UserStatusInActive); err != nil {
+		t.Fatalf("set status: %v", err)
+	}
+
+	// The SAME token, issued while the user was ACTIVE, must now be rejected.
+	rec = doJSON(t, r, http.MethodGet, "/api/v1/users/"+userID, token, nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("get user after deactivation: expected 401, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
