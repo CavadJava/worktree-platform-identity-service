@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, Form, Input, Modal, Select, Space, Table, Tag, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import type { User } from '../api/types';
 import { createUser, listAllUsers, setStatus, setSystemRole } from '../api/users';
 import { useQueryErrorToast } from '../hooks/useQueryErrorToast';
@@ -62,6 +63,21 @@ export function UsersPage() {
       title: 'Status',
       dataIndex: 'status',
       render: (status: string) => (status === 'ACTIVE' ? <Tag color="green">ACTIVE</Tag> : <Tag color="red">IN_ACTIVE</Tag>),
+    },
+    {
+      title: 'Mağaza',
+      render: (_: unknown, record: User) =>
+        record.shops && record.shops.length > 0 ? (
+          <Space direction="vertical" size="small">
+            {record.shops.map((m) => (
+              <Link key={m.id} to={`/shops/${m.shop_id}/members`}>
+                {m.shop_name} ({m.shop_role})
+              </Link>
+            ))}
+          </Space>
+        ) : (
+          <span style={{ color: '#999' }}>—</span>
+        ),
     },
     {
       title: 'Əməliyyat',

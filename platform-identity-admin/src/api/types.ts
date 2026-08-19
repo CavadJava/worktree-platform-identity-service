@@ -41,6 +41,9 @@ export interface User {
   email: string;
   system_role: string;
   status: string;
+  // Only populated by GET /users (the superadmin system-wide list) —
+  // empty array, not undefined, for a user with no shop memberships.
+  shops?: Member[];
 }
 
 export interface JwtClaims {
