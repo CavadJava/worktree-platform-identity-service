@@ -13,7 +13,7 @@ interface LoginFormValues {
 
 export function LoginPage() {
   const [loading, setLoading] = useState(false);
-  const { login: setToken, setMyShop } = useAuth();
+  const { login: setToken, logout, setMyShop } = useAuth();
   const navigate = useNavigate();
 
   async function onFinish(values: LoginFormValues) {
@@ -30,14 +30,18 @@ export function LoginPage() {
 
       // Not a system-level admin — check if they're a shop-admin or
       // shop-user of at least one shop, which also earns panel access
-      // (scoped to just that shop's members page).
+      // (scoped to just that shop's members page). The token must be
+      // stored BEFORE this call — the API client's request interceptor
+      // reads it from localStorage, and GET /users/{id}/shops requires
+      // auth, so calling it with setToken still pending 401s.
+      setToken(token);
       const memberships = await listUserShops(claims.user_id);
       if (memberships.length === 0) {
         message.error('Yalnız admin, superadmin, ya da bir mağazanın üzvü olan istifadəçilər giriş edə bilər');
+        logout();
         return;
       }
 
-      setToken(token);
       setMyShop(memberships[0].shop_id, memberships[0].shop_role);
       navigate(`/shops/${memberships[0].shop_id}/members`);
     } catch (err) {
