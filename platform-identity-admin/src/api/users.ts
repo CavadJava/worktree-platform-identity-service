@@ -38,6 +38,17 @@ export async function setStatus(userId: string, status: string): Promise<User> {
   return response.data;
 }
 
+export interface ProfileUpdateInput {
+  name?: string;
+  email?: string;
+  password?: string;
+}
+
+export async function updateProfile(userId: string, update: ProfileUpdateInput): Promise<User> {
+  const response = await platformIdentityApi.post<User>(`/users/${userId}/profile`, update);
+  return response.data;
+}
+
 export async function listUserShops(userId: string): Promise<Member[]> {
   const response = await platformIdentityApi.get<Member[]>(`/users/${userId}/shops`);
   return response.data;
@@ -60,6 +71,15 @@ export async function setMemberRole(shopId: string, userId: string, shopRole: st
   const response = await platformIdentityApi.post<Member>(`/shops/${shopId}/members/${userId}/role`, {
     shop_role: shopRole,
   });
+  return response.data;
+}
+
+export async function removeShopMember(shopId: string, userId: string): Promise<void> {
+  await platformIdentityApi.delete(`/shops/${shopId}/members/${userId}`);
+}
+
+export async function updateMemberProfile(shopId: string, userId: string, update: ProfileUpdateInput): Promise<User> {
+  const response = await platformIdentityApi.post<User>(`/shops/${shopId}/members/${userId}/profile`, update);
   return response.data;
 }
 

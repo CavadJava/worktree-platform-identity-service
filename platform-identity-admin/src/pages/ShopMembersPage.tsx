@@ -1,11 +1,20 @@
 import { useState } from 'react';
-import { Button, Form, Input, Modal, Select, Space, Table, Typography, message } from 'antd';
+import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import type { Member } from '../api/types';
 import { getShop } from '../api/shops';
 import { listShopRoles } from '../api/systemRoles';
-import { addNewShopMember, addShopMember, listAllUsers, listShopMembers, setMemberRole } from '../api/users';
+import {
+  addNewShopMember,
+  addShopMember,
+  listAllUsers,
+  listShopMembers,
+  removeShopMember,
+  setMemberRole,
+  updateMemberProfile,
+  type ProfileUpdateInput,
+} from '../api/users';
 import { useAuth } from '../auth/AuthContext';
 import { useQueryErrorToast } from '../hooks/useQueryErrorToast';
 
@@ -14,6 +23,12 @@ interface NewMemberFormValues {
   username: string;
   email: string;
   password: string;
+}
+
+interface EditProfileFormValues {
+  name?: string;
+  email?: string;
+  password?: string;
 }
 
 export function ShopMembersPage() {
@@ -29,6 +44,8 @@ export function ShopMembersPage() {
   const [selectedShopRole, setSelectedShopRole] = useState<string | null>(null);
   const [newMemberModalOpen, setNewMemberModalOpen] = useState(false);
   const [newMemberForm] = Form.useForm<NewMemberFormValues>();
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [editForm] = Form.useForm<EditProfileFormValues>();
 
   const { data: shop } = useQuery({ queryKey: ['shop', shopId], queryFn: () => getShop(shopId!), enabled: !!shopId });
 
@@ -82,29 +99,77 @@ export function ShopMembersPage() {
     onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
   });
 
+  const removeMutation = useMutation({
+    mutationFn: (userId: string) => removeShopMember(shopId!, userId),
+    onSuccess: () => {
+      message.success('Üzv silindi');
+      invalidateMembers();
+    },
+    onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
+  });
+
+  const editProfileMutation = useMutation({
+    mutationFn: (values: EditProfileFormValues) => {
+      const update: ProfileUpdateInput = {};
+      if (values.name) update.name = values.name;
+      if (values.email) update.email = values.email;
+      if (values.password) update.password = values.password;
+      return updateMemberProfile(shopId!, editingMember!.user_id, update);
+    },
+    onSuccess: () => {
+      message.success('Məlumatlar yeniləndi');
+      setEditingMember(null);
+      editForm.resetFields();
+      invalidateMembers();
+    },
+    onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
+  });
+
   const columns = [
     { title: 'User ID', dataIndex: 'user_id' },
     { title: 'Shop rolu', dataIndex: 'shop_role' },
     {
       title: 'Əməliyyat',
-      render: (_: unknown, record: Member) => (
-        <Space>
-          <Button
-            size="small"
-            disabled={record.shop_role === 'shop-admin'}
-            onClick={() => setRoleMutation.mutate({ userId: record.user_id, shopRole: 'shop-admin' })}
-          >
-            Shop-admin et
-          </Button>
-          <Button
-            size="small"
-            disabled={record.shop_role === 'shop-user'}
-            onClick={() => setRoleMutation.mutate({ userId: record.user_id, shopRole: 'shop-user' })}
-          >
-            Shop-user et
-          </Button>
-        </Space>
-      ),
+      render: (_: unknown, record: Member) => {
+        // A shop-admin cannot change their own role or remove themself —
+        // the backend enforces this too, but disabling here avoids a
+        // confusing 403 round-trip for the obvious case.
+        const isSelf = record.user_id === claims?.user_id;
+        return (
+          <Space direction="vertical">
+            <Space>
+              <Button
+                size="small"
+                disabled={record.shop_role === 'shop-admin' || isSelf}
+                onClick={() => setRoleMutation.mutate({ userId: record.user_id, shopRole: 'shop-admin' })}
+              >
+                Shop-admin et
+              </Button>
+              <Button
+                size="small"
+                disabled={record.shop_role === 'shop-user' || isSelf}
+                onClick={() => setRoleMutation.mutate({ userId: record.user_id, shopRole: 'shop-user' })}
+              >
+                Shop-user et
+              </Button>
+            </Space>
+            <Space>
+              <Button size="small" onClick={() => setEditingMember(record)}>
+                Redaktə et
+              </Button>
+              <Popconfirm
+                title="Bu üzv silinsin?"
+                onConfirm={() => removeMutation.mutate(record.user_id)}
+                disabled={isSelf}
+              >
+                <Button size="small" danger disabled={isSelf}>
+                  Sil
+                </Button>
+              </Popconfirm>
+            </Space>
+          </Space>
+        );
+      },
     },
   ];
 
@@ -169,6 +234,28 @@ export function ShopMembersPage() {
             <Input />
           </Form.Item>
           <Form.Item name="password" label="Şifrə" rules={[{ required: true }]}>
+            <Input.Password />
+          </Form.Item>
+        </Form>
+      </Modal>
+      <Modal
+        title="Üzvü redaktə et"
+        open={!!editingMember}
+        onCancel={() => {
+          setEditingMember(null);
+          editForm.resetFields();
+        }}
+        onOk={() => editForm.submit()}
+        confirmLoading={editProfileMutation.isPending}
+      >
+        <Form form={editForm} layout="vertical" onFinish={(values) => editProfileMutation.mutate(values)}>
+          <Form.Item name="name" label="Ad (boş burax — dəyişməsin)">
+            <Input />
+          </Form.Item>
+          <Form.Item name="email" label="Email (boş burax — dəyişməsin)" rules={[{ type: 'email' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="password" label="Yeni şifrə (boş burax — dəyişməsin)">
             <Input.Password />
           </Form.Item>
         </Form>
