@@ -12,10 +12,7 @@ import (
 	"platform-identity-service/internal/repository"
 )
 
-const (
-	roleIDUser  int16 = 1
-	roleIDAdmin int16 = 2
-)
+const systemRoleIDUser int16 = 3
 
 var (
 	ErrUserNotFound       = repository.ErrUserNotFound
@@ -25,58 +22,39 @@ var (
 )
 
 type AuthService struct {
-	projectRepo *repository.ProjectRepository
-	userRepo    *repository.UserRepository
-	jwt         *auth.JWTManager
+	userRepo *repository.UserRepository
+	jwt      *auth.JWTManager
 }
 
-func NewAuthService(projectRepo *repository.ProjectRepository, userRepo *repository.UserRepository, jwt *auth.JWTManager) *AuthService {
-	return &AuthService{projectRepo: projectRepo, userRepo: userRepo, jwt: jwt}
+func NewAuthService(userRepo *repository.UserRepository, jwt *auth.JWTManager) *AuthService {
+	return &AuthService{userRepo: userRepo, jwt: jwt}
 }
 
 type RegisterInput struct {
-	ProjectID string
-	Name      string
-	Username  string
-	Email     string
-	Password  string
+	Name     string
+	Username string
+	Email    string
+	Password string
 }
 
-// Register creates a user under the given project. The first user ever
-// registered for a project becomes admin; every later one becomes user.
-// CountByProject + Create both run against the same *sql.DB without an
-// explicit transaction here — acceptable for this practice project's
-// traffic level, but the race window (two concurrent first registrations
-// both seeing count==0) is a known, documented limitation, not an oversight.
+// Register creates a Teslahubs-wide account. Every registered user starts
+// as system role 'user' with no shop memberships — shop membership is
+// admin-granted afterward via ShopMembershipService, not part of signup.
 func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*models.User, error) {
-	if _, err := s.projectRepo.GetByID(ctx, in.ProjectID); err != nil {
-		return nil, err
-	}
-
 	hash, err := auth.HashPassword(in.Password)
 	if err != nil {
 		return nil, err
 	}
 
-	count, err := s.userRepo.CountByProject(ctx, in.ProjectID)
-	if err != nil {
-		return nil, err
-	}
-	roleID := roleIDUser
-	if count == 0 {
-		roleID = roleIDAdmin
-	}
-
 	now := time.Now().UTC()
-	projectID := in.ProjectID
 	u := &models.User{
 		ID:           uuid.NewString(),
 		Name:         in.Name,
 		Username:     in.Username,
 		Email:        in.Email,
 		PasswordHash: hash,
-		ProjectID:    &projectID,
-		RoleID:       &roleID,
+		SystemRoleID: systemRoleIDUser,
+		Status:       models.UserStatusActive,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -105,9 +83,5 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (string, time.Ti
 		return "", time.Time{}, ErrInvalidCredentials
 	}
 
-	projectID := ""
-	if u.ProjectID != nil {
-		projectID = *u.ProjectID
-	}
-	return s.jwt.Generate(u.ID, projectID, u.RoleName)
+	return s.jwt.Generate(u.ID, u.SystemRoleName)
 }

@@ -6,90 +6,69 @@ import (
 
 	"platform-identity-service/internal/models"
 	"platform-identity-service/internal/repository"
-	"platform-identity-service/internal/service/roleassign"
+	"platform-identity-service/internal/service/shopassign"
 )
 
-var ErrForbidden = errors.New("forbidden")
+var (
+	ErrForbidden         = errors.New("forbidden")
+	ErrInvalidSystemRole = errors.New("invalid system role: must be 'superadmin', 'admin', or 'user'")
+	ErrInvalidStatus     = errors.New("invalid status: must be 'ACTIVE' or 'IN_ACTIVE'")
+)
 
-var roleNameToID = map[string]int16{
-	models.RoleUser:  roleIDUser,
-	models.RoleAdmin: roleIDAdmin,
+var systemRoleNameToID = map[string]int16{
+	models.SystemRoleSuperadmin: 1,
+	models.SystemRoleAdmin:      2,
+	models.SystemRoleUser:       3,
 }
 
 type UserService struct {
-	repo     *repository.UserRepository
-	assigner roleassign.RoleAssigner
+	repo *repository.UserRepository
 }
 
-func NewUserService(repo *repository.UserRepository, assigner roleassign.RoleAssigner) *UserService {
-	return &UserService{repo: repo, assigner: assigner}
+func NewUserService(repo *repository.UserRepository) *UserService {
+	return &UserService{repo: repo}
 }
 
-// Get returns userID's record if caller is that same user, or an admin
-// within the target's own project.
-func (s *UserService) Get(ctx context.Context, caller roleassign.Caller, userID string) (*models.User, error) {
-	target, err := s.repo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	targetProjectID := ""
-	if target.ProjectID != nil {
-		targetProjectID = *target.ProjectID
-	}
-
-	isSelf := caller.UserID == userID
-	isSameProjectAdmin := s.assigner.CanAssign(caller, roleassign.Target{UserID: userID, ProjectID: targetProjectID})
-	if !isSelf && !isSameProjectAdmin {
+// Get returns userID's record if caller is that same user or a superadmin.
+// Shop-scoped viewing (e.g. a shop-admin seeing their own shop's members)
+// goes through ShopMembershipService instead — this method is strictly
+// about the system-wide user record.
+func (s *UserService) Get(ctx context.Context, caller shopassign.Caller, userID string) (*models.User, error) {
+	if caller.UserID != userID && caller.SystemRole != models.SystemRoleSuperadmin {
 		return nil, ErrForbidden
 	}
-
-	return target, nil
+	return s.repo.GetByID(ctx, userID)
 }
 
-// ListAll returns every user across every project. Unlike the other
-// UserService methods, this check does not go through the injected
-// RoleAssigner — there is no single target project to test CanAssign
-// against, since "give me everything" is a different shape of question
-// than "can I act on this one project/user."
-func (s *UserService) ListAll(ctx context.Context, caller roleassign.Caller) ([]models.User, error) {
-	if caller.Role != models.RoleSuperadmin {
+func (s *UserService) ListAll(ctx context.Context, caller shopassign.Caller) ([]models.User, error) {
+	if caller.SystemRole != models.SystemRoleSuperadmin {
 		return nil, ErrForbidden
 	}
 	return s.repo.ListAll(ctx)
 }
 
-// ListByProject returns every user in projectID. Caller must be an admin
-// within that same project — reuses the same RoleAssigner check as SetRole,
-// with the project itself as the target (UserID is irrelevant to CanAssign).
-func (s *UserService) ListByProject(ctx context.Context, caller roleassign.Caller, projectID string) ([]models.User, error) {
-	if !s.assigner.CanAssign(caller, roleassign.Target{ProjectID: projectID}) {
+func (s *UserService) SetSystemRole(ctx context.Context, caller shopassign.Caller, targetUserID, newSystemRoleName string) (*models.User, error) {
+	if caller.SystemRole != models.SystemRoleSuperadmin {
 		return nil, ErrForbidden
 	}
-	return s.repo.ListByProject(ctx, projectID)
-}
-
-func (s *UserService) SetRole(ctx context.Context, caller roleassign.Caller, targetUserID, newRoleName string) (*models.User, error) {
-	target, err := s.repo.GetByID(ctx, targetUserID)
-	if err != nil {
+	roleID, ok := systemRoleNameToID[newSystemRoleName]
+	if !ok {
+		return nil, ErrInvalidSystemRole
+	}
+	if err := s.repo.SetSystemRole(ctx, targetUserID, roleID); err != nil {
 		return nil, err
 	}
+	return s.repo.GetByID(ctx, targetUserID)
+}
 
-	targetProjectID := ""
-	if target.ProjectID != nil {
-		targetProjectID = *target.ProjectID
-	}
-
-	if !s.assigner.CanAssign(caller, roleassign.Target{UserID: targetUserID, ProjectID: targetProjectID}) {
+func (s *UserService) SetStatus(ctx context.Context, caller shopassign.Caller, targetUserID, newStatus string) (*models.User, error) {
+	if caller.SystemRole != models.SystemRoleSuperadmin {
 		return nil, ErrForbidden
 	}
-
-	roleID, ok := roleNameToID[newRoleName]
-	if !ok {
-		return nil, errors.New("invalid role name: must be 'user' or 'admin'")
+	if newStatus != models.UserStatusActive && newStatus != models.UserStatusInActive {
+		return nil, ErrInvalidStatus
 	}
-
-	if err := s.repo.SetRole(ctx, targetUserID, roleID); err != nil {
+	if err := s.repo.SetStatus(ctx, targetUserID, newStatus); err != nil {
 		return nil, err
 	}
 	return s.repo.GetByID(ctx, targetUserID)

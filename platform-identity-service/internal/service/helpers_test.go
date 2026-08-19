@@ -16,7 +16,7 @@ func testDB(t *testing.T) *sql.DB {
 	t.Helper()
 	dsn := os.Getenv("TEST_DSN")
 	if dsn == "" {
-		dsn = "host=localhost port=5433 user=postgres password=1 dbname=postgres sslmode=disable"
+		dsn = "host=localhost port=5433 user=postgres password=1 dbname=platform_identity sslmode=disable"
 	}
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
@@ -29,8 +29,14 @@ func testDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func newAuthAndProjectServiceFromRepos(t *testing.T, projectRepo *repository.ProjectRepository, userRepo *repository.UserRepository) (*AuthService, *ProjectService) {
+func newTestAuthService(t *testing.T) *AuthService {
 	t.Helper()
+	db := testDB(t)
+	userRepo := repository.NewUserRepository(db)
 	jwt := auth.NewJWTManager("test-secret", 60)
-	return NewAuthService(projectRepo, userRepo, jwt), NewProjectService(projectRepo)
+	return NewAuthService(userRepo, jwt)
+}
+
+func newTestJWTManager() *auth.JWTManager {
+	return auth.NewJWTManager("test-secret", 60)
 }

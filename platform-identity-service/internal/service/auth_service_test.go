@@ -6,64 +6,54 @@ import (
 
 	"github.com/google/uuid"
 
-	"platform-identity-service/internal/auth"
-	"platform-identity-service/internal/repository"
+	"platform-identity-service/internal/models"
 )
 
-func newTestAuthService(t *testing.T) (*AuthService, *ProjectService) {
-	t.Helper()
-	db := testDB(t)
-	projectRepo := repository.NewProjectRepository(db)
-	userRepo := repository.NewUserRepository(db)
-	jwt := auth.NewJWTManager("test-secret", 60)
-	return NewAuthService(projectRepo, userRepo, jwt), NewProjectService(projectRepo)
-}
+func TestAuthService_Register_AlwaysCreatesPlainUser(t *testing.T) {
+	authSvc := newTestAuthService(t)
 
-func TestAuthService_Register_FirstUserBecomesAdmin(t *testing.T) {
-	authSvc, projectSvc := newTestAuthService(t)
-
-	p, err := projectSvc.Create(context.Background(), "First-Admin Test "+uuid.NewString())
-	if err != nil {
-		t.Fatalf("Create project failed: %v", err)
-	}
-
-	first, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "First", Username: "first-" + uuid.NewString(),
+	u, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "First", Username: "first-" + uuid.NewString(),
 		Email: uuid.NewString() + "@example.com", Password: "password123",
 	})
 	if err != nil {
-		t.Fatalf("Register (first) failed: %v", err)
+		t.Fatalf("Register failed: %v", err)
 	}
-	if first.RoleName != "admin" {
-		t.Errorf("expected first registered user to be 'admin', got %q", first.RoleName)
+	if u.SystemRoleName != models.SystemRoleUser {
+		t.Errorf("expected system role 'user', got %q", u.SystemRoleName)
+	}
+	if u.Status != models.UserStatusActive {
+		t.Errorf("expected status ACTIVE, got %q", u.Status)
 	}
 
-	second, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "Second", Username: "second-" + uuid.NewString(),
+	// A second registration also becomes a plain user — no more
+	// first-user-becomes-admin behavior, since registration is no longer
+	// shop-scoped.
+	u2, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Second", Username: "second-" + uuid.NewString(),
 		Email: uuid.NewString() + "@example.com", Password: "password123",
 	})
 	if err != nil {
-		t.Fatalf("Register (second) failed: %v", err)
+		t.Fatalf("second Register failed: %v", err)
 	}
-	if second.RoleName != "user" {
-		t.Errorf("expected second registered user to be 'user', got %q", second.RoleName)
+	if u2.SystemRoleName != models.SystemRoleUser {
+		t.Errorf("expected second user's system role 'user', got %q", u2.SystemRoleName)
 	}
 }
 
 func TestAuthService_Register_DuplicateUsername(t *testing.T) {
-	authSvc, projectSvc := newTestAuthService(t)
-	p, _ := projectSvc.Create(context.Background(), "Dup Test "+uuid.NewString())
+	authSvc := newTestAuthService(t)
 
 	username := "dup-" + uuid.NewString()
 	_, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "A", Username: username, Email: uuid.NewString() + "@example.com", Password: "password123",
+		Name: "A", Username: username, Email: uuid.NewString() + "@example.com", Password: "password123",
 	})
 	if err != nil {
 		t.Fatalf("first Register failed: %v", err)
 	}
 
 	_, err = authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "B", Username: username, Email: uuid.NewString() + "@example.com", Password: "password123",
+		Name: "B", Username: username, Email: uuid.NewString() + "@example.com", Password: "password123",
 	})
 	if err != ErrUsernameTaken {
 		t.Errorf("expected ErrUsernameTaken, got %v", err)
@@ -71,13 +61,11 @@ func TestAuthService_Register_DuplicateUsername(t *testing.T) {
 }
 
 func TestAuthService_Login_Success(t *testing.T) {
-	authSvc, projectSvc := newTestAuthService(t)
-	p, _ := projectSvc.Create(context.Background(), "Login Test "+uuid.NewString())
+	authSvc := newTestAuthService(t)
 
 	username := "login-" + uuid.NewString()
 	_, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "Login User", Username: username,
-		Email: uuid.NewString() + "@example.com", Password: "correct-password",
+		Name: "Login User", Username: username, Email: uuid.NewString() + "@example.com", Password: "correct-password",
 	})
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
@@ -93,13 +81,11 @@ func TestAuthService_Login_Success(t *testing.T) {
 }
 
 func TestAuthService_Login_WrongPassword(t *testing.T) {
-	authSvc, projectSvc := newTestAuthService(t)
-	p, _ := projectSvc.Create(context.Background(), "Login Fail Test "+uuid.NewString())
+	authSvc := newTestAuthService(t)
 
 	username := "loginfail-" + uuid.NewString()
 	_, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "User", Username: username,
-		Email: uuid.NewString() + "@example.com", Password: "correct-password",
+		Name: "User", Username: username, Email: uuid.NewString() + "@example.com", Password: "correct-password",
 	})
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)

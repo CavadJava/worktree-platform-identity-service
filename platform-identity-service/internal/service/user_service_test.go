@@ -6,216 +6,152 @@ import (
 
 	"github.com/google/uuid"
 
+	"platform-identity-service/internal/models"
 	"platform-identity-service/internal/repository"
-	"platform-identity-service/internal/service/roleassign"
+	"platform-identity-service/internal/service/shopassign"
 )
 
-func newTestUserService(t *testing.T) (*UserService, *AuthService, *ProjectService) {
+func newTestUserService(t *testing.T) (*UserService, *AuthService) {
 	t.Helper()
 	db := testDB(t)
-	projectRepo := repository.NewProjectRepository(db)
 	userRepo := repository.NewUserRepository(db)
-	authSvc, projectSvc := newAuthAndProjectServiceFromRepos(t, projectRepo, userRepo)
-	userSvc := NewUserService(userRepo, roleassign.NewSameProjectAdmin())
-	return userSvc, authSvc, projectSvc
+	jwtMgr := newTestJWTManager()
+	authSvc := NewAuthService(userRepo, jwtMgr)
+	userSvc := NewUserService(userRepo)
+	return userSvc, authSvc
 }
 
-func TestUserService_SetRole_SameProjectAdminSucceeds(t *testing.T) {
-	userSvc, authSvc, projectSvc := newTestUserService(t)
+func TestUserService_Get_Self(t *testing.T) {
+	userSvc, authSvc := newTestUserService(t)
 
-	p, _ := projectSvc.Create(context.Background(), "SetRole Success "+uuid.NewString())
-	admin, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "Admin", Username: "admin-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", Password: "password123",
+	u, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Self", Username: "self-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
 	})
 	if err != nil {
-		t.Fatalf("register admin failed: %v", err)
-	}
-	member, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "Member", Username: "member-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", Password: "password123",
-	})
-	if err != nil {
-		t.Fatalf("register member failed: %v", err)
+		t.Fatalf("register failed: %v", err)
 	}
 
-	caller := roleassign.Caller{UserID: admin.ID, ProjectID: p.ID, Role: admin.RoleName}
-	updated, err := userSvc.SetRole(context.Background(), caller, member.ID, "admin")
+	caller := shopassign.Caller{UserID: u.ID, SystemRole: models.SystemRoleUser}
+	got, err := userSvc.Get(context.Background(), caller, u.ID)
 	if err != nil {
-		t.Fatalf("SetRole failed: %v", err)
+		t.Fatalf("Get self failed: %v", err)
 	}
-	if updated.RoleName != "admin" {
-		t.Errorf("expected member promoted to admin, got %q", updated.RoleName)
+	if got.ID != u.ID {
+		t.Errorf("expected id %q, got %q", u.ID, got.ID)
 	}
 }
 
-func TestUserService_Get_NonAdminCannotReadAnotherUser(t *testing.T) {
-	userSvc, authSvc, projectSvc := newTestUserService(t)
+func TestUserService_Get_ForbiddenForOtherPlainUser(t *testing.T) {
+	userSvc, authSvc := newTestUserService(t)
 
-	p, _ := projectSvc.Create(context.Background(), "Get Forbidden "+uuid.NewString())
-	admin, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "Admin", Username: "admin-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", Password: "password123",
+	caller, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Caller", Username: "caller-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
 	})
 	if err != nil {
-		t.Fatalf("register admin failed: %v", err)
+		t.Fatalf("register caller failed: %v", err)
 	}
-	member, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "Member", Username: "member-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", Password: "password123",
+	target, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Target", Username: "target-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
 	})
 	if err != nil {
-		t.Fatalf("register member failed: %v", err)
+		t.Fatalf("register target failed: %v", err)
 	}
 
-	callerForSecondUser := roleassign.Caller{UserID: member.ID, ProjectID: p.ID, Role: member.RoleName}
-	_, err = userSvc.Get(context.Background(), callerForSecondUser, admin.ID)
+	callerClaims := shopassign.Caller{UserID: caller.ID, SystemRole: models.SystemRoleUser}
+	_, err = userSvc.Get(context.Background(), callerClaims, target.ID)
 	if err != ErrForbidden {
-		t.Errorf("expected ErrForbidden for non-admin reading another user, got %v", err)
+		t.Errorf("expected ErrForbidden, got %v", err)
 	}
 }
 
-func TestUserService_SetRole_InvalidRoleNameRejected(t *testing.T) {
-	userSvc, authSvc, projectSvc := newTestUserService(t)
+func TestUserService_Get_SuperadminCanViewAnyone(t *testing.T) {
+	userSvc, authSvc := newTestUserService(t)
 
-	p, _ := projectSvc.Create(context.Background(), "Invalid Role "+uuid.NewString())
-	admin, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "Admin", Username: "admin-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", Password: "password123",
+	target, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Target", Username: "target-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
 	})
 	if err != nil {
-		t.Fatalf("register admin failed: %v", err)
-	}
-	member, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "Member", Username: "member-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", Password: "password123",
-	})
-	if err != nil {
-		t.Fatalf("register member failed: %v", err)
+		t.Fatalf("register target failed: %v", err)
 	}
 
-	caller := roleassign.Caller{UserID: admin.ID, ProjectID: p.ID, Role: admin.RoleName}
-	_, err = userSvc.SetRole(context.Background(), caller, member.ID, "superadmin")
-	if err == nil {
-		t.Fatal("expected error for invalid role name, got nil")
+	superadminCaller := shopassign.Caller{UserID: "superadmin-id", SystemRole: models.SystemRoleSuperadmin}
+	got, err := userSvc.Get(context.Background(), superadminCaller, target.ID)
+	if err != nil {
+		t.Fatalf("Get by superadmin failed: %v", err)
+	}
+	if got.ID != target.ID {
+		t.Errorf("expected id %q, got %q", target.ID, got.ID)
 	}
 }
 
-func TestUserService_ListAll_SuperadminSucceeds(t *testing.T) {
-	userSvc, authSvc, projectSvc := newTestUserService(t)
+func TestUserService_ListAll_SuperadminOnly(t *testing.T) {
+	userSvc, authSvc := newTestUserService(t)
 
-	p, _ := projectSvc.Create(context.Background(), "ListAll Success "+uuid.NewString())
 	_, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "Member", Username: "listall-member-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", Password: "password123",
+		Name: "Someone", Username: "someone-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
 	})
 	if err != nil {
-		t.Fatalf("register member failed: %v", err)
+		t.Fatalf("register failed: %v", err)
 	}
 
-	superadminCaller := roleassign.Caller{UserID: "superadmin-id", ProjectID: "", Role: "superadmin"}
+	superadminCaller := shopassign.Caller{UserID: "superadmin-id", SystemRole: models.SystemRoleSuperadmin}
 	users, err := userSvc.ListAll(context.Background(), superadminCaller)
 	if err != nil {
-		t.Fatalf("ListAll failed: %v", err)
+		t.Fatalf("ListAll by superadmin failed: %v", err)
 	}
 	if len(users) == 0 {
-		t.Error("expected at least one user in ListAll result")
-	}
-}
-
-func TestUserService_ListAll_NonSuperadminForbidden(t *testing.T) {
-	userSvc, authSvc, projectSvc := newTestUserService(t)
-
-	p, _ := projectSvc.Create(context.Background(), "ListAll Forbidden "+uuid.NewString())
-	admin, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "Admin", Username: "listall-admin-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", Password: "password123",
-	})
-	if err != nil {
-		t.Fatalf("register admin failed: %v", err)
+		t.Error("expected at least one user")
 	}
 
-	adminCaller := roleassign.Caller{UserID: admin.ID, ProjectID: p.ID, Role: admin.RoleName}
-	_, err = userSvc.ListAll(context.Background(), adminCaller)
+	plainCaller := shopassign.Caller{UserID: "someone-id", SystemRole: models.SystemRoleUser}
+	_, err = userSvc.ListAll(context.Background(), plainCaller)
 	if err != ErrForbidden {
-		t.Errorf("expected ErrForbidden for non-superadmin caller, got %v", err)
+		t.Errorf("expected ErrForbidden for plain user, got %v", err)
 	}
 }
 
-func TestUserService_ListByProject_SameProjectAdminSucceeds(t *testing.T) {
-	userSvc, authSvc, projectSvc := newTestUserService(t)
+func TestUserService_SetSystemRole_SuperadminOnly(t *testing.T) {
+	userSvc, authSvc := newTestUserService(t)
 
-	p, _ := projectSvc.Create(context.Background(), "ListByProject Success "+uuid.NewString())
-	admin, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "Admin", Username: "admin-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", Password: "password123",
+	target, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Target", Username: "target-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
 	})
 	if err != nil {
-		t.Fatalf("register admin failed: %v", err)
+		t.Fatalf("register target failed: %v", err)
 	}
-	_, err = authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p.ID, Name: "Member", Username: "member-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", Password: "password123",
-	})
+
+	superadminCaller := shopassign.Caller{UserID: "superadmin-id", SystemRole: models.SystemRoleSuperadmin}
+	updated, err := userSvc.SetSystemRole(context.Background(), superadminCaller, target.ID, models.SystemRoleAdmin)
 	if err != nil {
-		t.Fatalf("register member failed: %v", err)
+		t.Fatalf("SetSystemRole failed: %v", err)
+	}
+	if updated.SystemRoleName != models.SystemRoleAdmin {
+		t.Errorf("expected 'admin', got %q", updated.SystemRoleName)
 	}
 
-	caller := roleassign.Caller{UserID: admin.ID, ProjectID: p.ID, Role: admin.RoleName}
-	users, err := userSvc.ListByProject(context.Background(), caller, p.ID)
-	if err != nil {
-		t.Fatalf("ListByProject failed: %v", err)
-	}
-	if len(users) != 2 {
-		t.Errorf("expected 2 users (admin + member), got %d", len(users))
-	}
-}
-
-func TestUserService_ListByProject_CrossProjectForbidden(t *testing.T) {
-	userSvc, authSvc, projectSvc := newTestUserService(t)
-
-	p1, _ := projectSvc.Create(context.Background(), "ListByProject Cross A "+uuid.NewString())
-	p2, _ := projectSvc.Create(context.Background(), "ListByProject Cross B "+uuid.NewString())
-
-	admin1, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p1.ID, Name: "Admin1", Username: "admin1-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", Password: "password123",
-	})
-	if err != nil {
-		t.Fatalf("register admin1 failed: %v", err)
-	}
-
-	caller := roleassign.Caller{UserID: admin1.ID, ProjectID: p1.ID, Role: admin1.RoleName}
-	_, err = userSvc.ListByProject(context.Background(), caller, p2.ID)
+	plainCaller := shopassign.Caller{UserID: target.ID, SystemRole: models.SystemRoleAdmin}
+	_, err = userSvc.SetSystemRole(context.Background(), plainCaller, target.ID, models.SystemRoleSuperadmin)
 	if err != ErrForbidden {
-		t.Errorf("expected ErrForbidden for cross-project list, got %v", err)
+		t.Errorf("expected ErrForbidden for non-superadmin, got %v", err)
 	}
 }
 
-func TestUserService_SetRole_CrossProjectForbidden(t *testing.T) {
-	userSvc, authSvc, projectSvc := newTestUserService(t)
+func TestUserService_SetStatus_SuperadminOnly(t *testing.T) {
+	userSvc, authSvc := newTestUserService(t)
 
-	p1, _ := projectSvc.Create(context.Background(), "Cross Project A "+uuid.NewString())
-	p2, _ := projectSvc.Create(context.Background(), "Cross Project B "+uuid.NewString())
-
-	admin1, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p1.ID, Name: "Admin1", Username: "admin1-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", Password: "password123",
+	target, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Target", Username: "target-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
 	})
 	if err != nil {
-		t.Fatalf("register admin1 failed: %v", err)
-	}
-	member2, err := authSvc.Register(context.Background(), RegisterInput{
-		ProjectID: p2.ID, Name: "Member2", Username: "member2-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", Password: "password123",
-	})
-	if err != nil {
-		t.Fatalf("register member2 failed: %v", err)
+		t.Fatalf("register target failed: %v", err)
 	}
 
-	caller := roleassign.Caller{UserID: admin1.ID, ProjectID: p1.ID, Role: admin1.RoleName}
-	_, err = userSvc.SetRole(context.Background(), caller, member2.ID, "admin")
-	if err != ErrForbidden {
-		t.Errorf("expected ErrForbidden for cross-project assignment, got %v", err)
+	superadminCaller := shopassign.Caller{UserID: "superadmin-id", SystemRole: models.SystemRoleSuperadmin}
+	updated, err := userSvc.SetStatus(context.Background(), superadminCaller, target.ID, models.UserStatusInActive)
+	if err != nil {
+		t.Fatalf("SetStatus failed: %v", err)
+	}
+	if updated.Status != models.UserStatusInActive {
+		t.Errorf("expected IN_ACTIVE, got %q", updated.Status)
 	}
 }
