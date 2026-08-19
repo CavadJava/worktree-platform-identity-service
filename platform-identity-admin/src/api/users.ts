@@ -1,17 +1,47 @@
 import { platformIdentityApi } from './httpClients';
-import type { User } from './types';
-
-export async function listUsersByProject(projectId: string): Promise<User[]> {
-  const response = await platformIdentityApi.get<User[]>(`/projects/${projectId}/users`);
-  return response.data;
-}
-
-export async function setUserRole(userId: string, role: string): Promise<User> {
-  const response = await platformIdentityApi.post<User>(`/users/${userId}/role`, { role });
-  return response.data;
-}
+import type { Member, User } from './types';
 
 export async function listAllUsers(): Promise<User[]> {
   const response = await platformIdentityApi.get<User[]>('/users');
+  return response.data;
+}
+
+export async function getUser(id: string): Promise<User> {
+  const response = await platformIdentityApi.get<User>(`/users/${id}`);
+  return response.data;
+}
+
+export async function setSystemRole(userId: string, systemRole: string): Promise<User> {
+  const response = await platformIdentityApi.post<User>(`/users/${userId}/system-role`, { system_role: systemRole });
+  return response.data;
+}
+
+export async function setStatus(userId: string, status: string): Promise<User> {
+  const response = await platformIdentityApi.post<User>(`/users/${userId}/status`, { status });
+  return response.data;
+}
+
+export async function listUserShops(userId: string): Promise<Member[]> {
+  const response = await platformIdentityApi.get<Member[]>(`/users/${userId}/shops`);
+  return response.data;
+}
+
+export async function listShopMembers(shopId: string): Promise<Member[]> {
+  const response = await platformIdentityApi.get<Member[]>(`/shops/${shopId}/members`);
+  return response.data;
+}
+
+export async function addShopMember(shopId: string, userId: string, shopRole: string): Promise<Member> {
+  const response = await platformIdentityApi.post<Member>(`/shops/${shopId}/members`, {
+    user_id: userId,
+    shop_role: shopRole,
+  });
+  return response.data;
+}
+
+export async function setMemberRole(shopId: string, userId: string, shopRole: string): Promise<Member> {
+  const response = await platformIdentityApi.post<Member>(`/shops/${shopId}/members/${userId}/role`, {
+    shop_role: shopRole,
+  });
   return response.data;
 }
