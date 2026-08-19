@@ -26,11 +26,11 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 
 func (r *UserRepository) Create(ctx context.Context, u *models.User) error {
 	const q = `
-		INSERT INTO users (id, name, username, email, password_hash, project_id, role_id, created_at, updated_at)
+		INSERT INTO users (id, name, username, email, password_hash, system_role_id, status, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 	_, err := r.db.ExecContext(ctx, q,
-		u.ID, u.Name, u.Username, u.Email, u.PasswordHash, u.ProjectID, u.RoleID, u.CreatedAt, u.UpdatedAt,
+		u.ID, u.Name, u.Username, u.Email, u.PasswordHash, u.SystemRoleID, u.Status, u.CreatedAt, u.UpdatedAt,
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -45,17 +45,16 @@ func (r *UserRepository) Create(ctx context.Context, u *models.User) error {
 	return nil
 }
 
-const selectUserWithRole = `
-	SELECT u.id, u.name, u.username, u.email, u.password_hash, u.project_id, u.role_id,
-	       COALESCE(r.name, ''), u.created_at, u.updated_at
+const selectUserWithSystemRole = `
+	SELECT u.id, u.name, u.username, u.email, u.password_hash, u.system_role_id, sr.name, u.status, u.created_at, u.updated_at
 	FROM users u
-	LEFT JOIN roles r ON r.id = u.role_id
+	JOIN system_roles sr ON sr.id = u.system_role_id
 `
 
 func (r *UserRepository) scanUser(row *sql.Row) (*models.User, error) {
 	var u models.User
 	err := row.Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.PasswordHash,
-		&u.ProjectID, &u.RoleID, &u.RoleName, &u.CreatedAt, &u.UpdatedAt)
+		&u.SystemRoleID, &u.SystemRoleName, &u.Status, &u.CreatedAt, &u.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrUserNotFound
 	}
@@ -66,44 +65,17 @@ func (r *UserRepository) scanUser(row *sql.Row) (*models.User, error) {
 }
 
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
-	row := r.db.QueryRowContext(ctx, selectUserWithRole+" WHERE u.id = $1", id)
+	row := r.db.QueryRowContext(ctx, selectUserWithSystemRole+" WHERE u.id = $1", id)
 	return r.scanUser(row)
 }
 
 func (r *UserRepository) GetByUsernameOrEmail(ctx context.Context, identifier string) (*models.User, error) {
-	row := r.db.QueryRowContext(ctx, selectUserWithRole+" WHERE u.username = $1 OR u.email = $1", identifier)
+	row := r.db.QueryRowContext(ctx, selectUserWithSystemRole+" WHERE u.username = $1 OR u.email = $1", identifier)
 	return r.scanUser(row)
 }
 
-func (r *UserRepository) ListByProject(ctx context.Context, projectID string) ([]models.User, error) {
-	rows, err := r.db.QueryContext(ctx, selectUserWithRole+" WHERE u.project_id = $1 ORDER BY u.created_at", projectID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	users := []models.User{}
-	for rows.Next() {
-		var u models.User
-		if err := rows.Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.PasswordHash,
-			&u.ProjectID, &u.RoleID, &u.RoleName, &u.CreatedAt, &u.UpdatedAt); err != nil {
-			return nil, err
-		}
-		users = append(users, u)
-	}
-	return users, rows.Err()
-}
-
-const selectUserWithRoleAndProject = `
-	SELECT u.id, u.name, u.username, u.email, u.password_hash, u.project_id, u.role_id,
-	       COALESCE(r.name, ''), COALESCE(p.name, ''), u.created_at, u.updated_at
-	FROM users u
-	LEFT JOIN roles r ON r.id = u.role_id
-	LEFT JOIN projects p ON p.id = u.project_id
-`
-
 func (r *UserRepository) ListAll(ctx context.Context) ([]models.User, error) {
-	rows, err := r.db.QueryContext(ctx, selectUserWithRoleAndProject+" ORDER BY u.created_at")
+	rows, err := r.db.QueryContext(ctx, selectUserWithSystemRole+" ORDER BY u.created_at")
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +85,7 @@ func (r *UserRepository) ListAll(ctx context.Context) ([]models.User, error) {
 	for rows.Next() {
 		var u models.User
 		if err := rows.Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.PasswordHash,
-			&u.ProjectID, &u.RoleID, &u.RoleName, &u.ProjectName, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			&u.SystemRoleID, &u.SystemRoleName, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
@@ -121,16 +93,25 @@ func (r *UserRepository) ListAll(ctx context.Context) ([]models.User, error) {
 	return users, rows.Err()
 }
 
-func (r *UserRepository) CountByProject(ctx context.Context, projectID string) (int, error) {
-	const q = `SELECT COUNT(*) FROM users WHERE project_id = $1`
-	var count int
-	err := r.db.QueryRowContext(ctx, q, projectID).Scan(&count)
-	return count, err
+func (r *UserRepository) SetSystemRole(ctx context.Context, userID string, systemRoleID int16) error {
+	const q = `UPDATE users SET system_role_id = $2, updated_at = now() WHERE id = $1`
+	result, err := r.db.ExecContext(ctx, q, userID, systemRoleID)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrUserNotFound
+	}
+	return nil
 }
 
-func (r *UserRepository) SetRole(ctx context.Context, userID string, roleID int16) error {
-	const q = `UPDATE users SET role_id = $2, updated_at = now() WHERE id = $1`
-	result, err := r.db.ExecContext(ctx, q, userID, roleID)
+func (r *UserRepository) SetStatus(ctx context.Context, userID, status string) error {
+	const q = `UPDATE users SET status = $2, updated_at = now() WHERE id = $1`
+	result, err := r.db.ExecContext(ctx, q, userID, status)
 	if err != nil {
 		return err
 	}

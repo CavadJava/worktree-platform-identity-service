@@ -30,12 +30,269 @@ func testDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestProjectRepository_CreateAndGet(t *testing.T) {
+func TestShopRepository_CreateAndGet(t *testing.T) {
 	db := testDB(t)
 	defer db.Close()
-	repo := NewProjectRepository(db)
+	repo := NewShopRepository(db)
 
-	p := &models.Project{ID: uuid.NewString(), Name: "Test Project " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	s := &models.Shop{ID: uuid.NewString(), Name: "Test Shop " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	if err := repo.Create(context.Background(), s); err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	got, err := repo.GetByID(context.Background(), s.ID)
+	if err != nil {
+		t.Fatalf("GetByID failed: %v", err)
+	}
+	if got.Name != s.Name {
+		t.Errorf("expected name %q, got %q", s.Name, got.Name)
+	}
+}
+
+func TestShopRepository_GetByID_NotFound(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	repo := NewShopRepository(db)
+
+	_, err := repo.GetByID(context.Background(), uuid.NewString())
+	if err != ErrShopNotFound {
+		t.Errorf("expected ErrShopNotFound, got %v", err)
+	}
+}
+
+func TestSystemRoleRepository_List(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	repo := NewSystemRoleRepository(db)
+
+	roles, err := repo.List(context.Background())
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(roles) != 3 {
+		t.Fatalf("expected 3 seeded system roles, got %d", len(roles))
+	}
+	byName := map[string]int16{}
+	for _, r := range roles {
+		byName[r.Name] = r.ID
+	}
+	if byName["superadmin"] != 1 || byName["admin"] != 2 || byName["user"] != 3 {
+		t.Errorf("unexpected system role ids: %+v", byName)
+	}
+}
+
+func TestShopRoleRepository_List(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	repo := NewShopRoleRepository(db)
+
+	roles, err := repo.List(context.Background())
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(roles) != 2 {
+		t.Fatalf("expected 2 seeded shop roles, got %d", len(roles))
+	}
+	byName := map[string]int16{}
+	for _, r := range roles {
+		byName[r.Name] = r.ID
+	}
+	if byName["shop-admin"] != 1 || byName["shop-user"] != 2 {
+		t.Errorf("unexpected shop role ids: %+v", byName)
+	}
+}
+
+func createTestUser(t *testing.T, userRepo *UserRepository, systemRoleID int16) *models.User {
+	t.Helper()
+	now := time.Now().UTC()
+	u := &models.User{
+		ID: uuid.NewString(), Name: "Test User", Username: "u-" + uuid.NewString(),
+		Email: uuid.NewString() + "@example.com", PasswordHash: "hash",
+		SystemRoleID: systemRoleID, Status: models.UserStatusActive,
+		CreatedAt: now, UpdatedAt: now,
+	}
+	if err := userRepo.Create(context.Background(), u); err != nil {
+		t.Fatalf("create user failed: %v", err)
+	}
+	return u
+}
+
+func TestUserRepository_CreateGetListAll(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	userRepo := NewUserRepository(db)
+
+	u := createTestUser(t, userRepo, 3) // system role 'user'
+
+	got, err := userRepo.GetByID(context.Background(), u.ID)
+	if err != nil {
+		t.Fatalf("GetByID failed: %v", err)
+	}
+	if got.SystemRoleName != "user" {
+		t.Errorf("expected SystemRoleName 'user', got %q", got.SystemRoleName)
+	}
+	if got.Status != models.UserStatusActive {
+		t.Errorf("expected status ACTIVE, got %q", got.Status)
+	}
+
+	all, err := userRepo.ListAll(context.Background())
+	if err != nil {
+		t.Fatalf("ListAll failed: %v", err)
+	}
+	found := false
+	for _, u2 := range all {
+		if u2.ID == u.ID {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected created user in ListAll result")
+	}
+}
+
+func TestUserRepository_GetByUsernameOrEmail(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	userRepo := NewUserRepository(db)
+
+	u := createTestUser(t, userRepo, 3)
+
+	got, err := userRepo.GetByUsernameOrEmail(context.Background(), u.Username)
+	if err != nil {
+		t.Fatalf("by username failed: %v", err)
+	}
+	if got.ID != u.ID {
+		t.Errorf("expected id %q, got %q", u.ID, got.ID)
+	}
+
+	got, err = userRepo.GetByUsernameOrEmail(context.Background(), u.Email)
+	if err != nil {
+		t.Fatalf("by email failed: %v", err)
+	}
+	if got.ID != u.ID {
+		t.Errorf("expected id %q, got %q", u.ID, got.ID)
+	}
+
+	_, err = userRepo.GetByUsernameOrEmail(context.Background(), "nonexistent-"+uuid.NewString())
+	if err != ErrUserNotFound {
+		t.Errorf("expected ErrUserNotFound, got %v", err)
+	}
+}
+
+func TestUserRepository_SetSystemRole(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	userRepo := NewUserRepository(db)
+
+	u := createTestUser(t, userRepo, 3)
+
+	if err := userRepo.SetSystemRole(context.Background(), u.ID, 2); err != nil {
+		t.Fatalf("SetSystemRole failed: %v", err)
+	}
+
+	got, err := userRepo.GetByID(context.Background(), u.ID)
+	if err != nil {
+		t.Fatalf("GetByID failed: %v", err)
+	}
+	if got.SystemRoleName != "admin" {
+		t.Errorf("expected 'admin', got %q", got.SystemRoleName)
+	}
+}
+
+func TestUserRepository_SetStatus(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	userRepo := NewUserRepository(db)
+
+	u := createTestUser(t, userRepo, 3)
+
+	if err := userRepo.SetStatus(context.Background(), u.ID, models.UserStatusInActive); err != nil {
+		t.Fatalf("SetStatus failed: %v", err)
+	}
+
+	got, err := userRepo.GetByID(context.Background(), u.ID)
+	if err != nil {
+		t.Fatalf("GetByID failed: %v", err)
+	}
+	if got.Status != models.UserStatusInActive {
+		t.Errorf("expected IN_ACTIVE, got %q", got.Status)
+	}
+}
+
+func TestShopMembershipRepository_CreateListGetSetRole(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	shopRepo := NewShopRepository(db)
+	userRepo := NewUserRepository(db)
+	membershipRepo := NewShopMembershipRepository(db)
+
+	shop := &models.Shop{ID: uuid.NewString(), Name: "Membership Shop " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	if err := shopRepo.Create(context.Background(), shop); err != nil {
+		t.Fatalf("create shop failed: %v", err)
+	}
+	u1 := createTestUser(t, userRepo, 3)
+	u2 := createTestUser(t, userRepo, 3)
+
+	m1 := &models.ShopMembership{ID: uuid.NewString(), UserID: u1.ID, ShopID: shop.ID, ShopRoleID: 1, CreatedAt: time.Now().UTC()}
+	if err := membershipRepo.Create(context.Background(), m1); err != nil {
+		t.Fatalf("create membership 1 failed: %v", err)
+	}
+	m2 := &models.ShopMembership{ID: uuid.NewString(), UserID: u2.ID, ShopID: shop.ID, ShopRoleID: 2, CreatedAt: time.Now().UTC()}
+	if err := membershipRepo.Create(context.Background(), m2); err != nil {
+		t.Fatalf("create membership 2 failed: %v", err)
+	}
+
+	// Duplicate membership should fail.
+	dup := &models.ShopMembership{ID: uuid.NewString(), UserID: u1.ID, ShopID: shop.ID, ShopRoleID: 2, CreatedAt: time.Now().UTC()}
+	if err := membershipRepo.Create(context.Background(), dup); err != ErrMembershipExists {
+		t.Errorf("expected ErrMembershipExists, got %v", err)
+	}
+
+	members, err := membershipRepo.ListByShop(context.Background(), shop.ID)
+	if err != nil {
+		t.Fatalf("ListByShop failed: %v", err)
+	}
+	if len(members) != 2 {
+		t.Fatalf("expected 2 members, got %d", len(members))
+	}
+
+	got, err := membershipRepo.GetByUserAndShop(context.Background(), u1.ID, shop.ID)
+	if err != nil {
+		t.Fatalf("GetByUserAndShop failed: %v", err)
+	}
+	if got.ShopRoleName != "shop-admin" {
+		t.Errorf("expected shop-admin, got %q", got.ShopRoleName)
+	}
+	if got.ShopName != shop.Name {
+		t.Errorf("expected joined ShopName %q, got %q", shop.Name, got.ShopName)
+	}
+
+	if err := membershipRepo.SetShopRole(context.Background(), u1.ID, shop.ID, 2); err != nil {
+		t.Fatalf("SetShopRole failed: %v", err)
+	}
+	got, err = membershipRepo.GetByUserAndShop(context.Background(), u1.ID, shop.ID)
+	if err != nil {
+		t.Fatalf("GetByUserAndShop after SetShopRole failed: %v", err)
+	}
+	if got.ShopRoleName != "shop-user" {
+		t.Errorf("expected shop-user after change, got %q", got.ShopRoleName)
+	}
+
+	byUser, err := membershipRepo.ListByUser(context.Background(), u1.ID)
+	if err != nil {
+		t.Fatalf("ListByUser failed: %v", err)
+	}
+	if len(byUser) != 1 || byUser[0].ShopID != shop.ID {
+		t.Errorf("expected 1 membership for u1 in shop %q, got %+v", shop.ID, byUser)
+	}
+}
+
+func TestProductRepository_CreateListGet(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	repo := NewProductRepository(db)
+
+	p := &models.Product{ID: uuid.NewString(), Name: "Test Product " + uuid.NewString(), CreatedAt: time.Now().UTC()}
 	if err := repo.Create(context.Background(), p); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -47,307 +304,65 @@ func TestProjectRepository_CreateAndGet(t *testing.T) {
 	if got.Name != p.Name {
 		t.Errorf("expected name %q, got %q", p.Name, got.Name)
 	}
-}
 
-func TestProjectRepository_GetByID_NotFound(t *testing.T) {
-	db := testDB(t)
-	defer db.Close()
-	repo := NewProjectRepository(db)
-
-	_, err := repo.GetByID(context.Background(), uuid.NewString())
-	if err != ErrProjectNotFound {
-		t.Errorf("expected ErrProjectNotFound, got %v", err)
-	}
-}
-
-func TestUserRepository_CreateAndCount(t *testing.T) {
-	db := testDB(t)
-	defer db.Close()
-	projectRepo := NewProjectRepository(db)
-	userRepo := NewUserRepository(db)
-
-	p := &models.Project{ID: uuid.NewString(), Name: "Count Test", CreatedAt: time.Now().UTC()}
-	if err := projectRepo.Create(context.Background(), p); err != nil {
-		t.Fatalf("Create project failed: %v", err)
-	}
-
-	count, err := userRepo.CountByProject(context.Background(), p.ID)
-	if err != nil {
-		t.Fatalf("CountByProject failed: %v", err)
-	}
-	if count != 0 {
-		t.Fatalf("expected 0 users for new project, got %d", count)
-	}
-
-	roleID := int16(2) // admin, seeded second
-	u := &models.User{
-		ID: uuid.NewString(), Name: "Cavad", Username: "cavad-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", PasswordHash: "hash",
-		ProjectID: &p.ID, RoleID: &roleID,
-		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
-	}
-	if err := userRepo.Create(context.Background(), u); err != nil {
-		t.Fatalf("Create user failed: %v", err)
-	}
-
-	count, err = userRepo.CountByProject(context.Background(), p.ID)
-	if err != nil {
-		t.Fatalf("CountByProject failed: %v", err)
-	}
-	if count != 1 {
-		t.Fatalf("expected 1 user after create, got %d", count)
-	}
-
-	got, err := userRepo.GetByID(context.Background(), u.ID)
-	if err != nil {
-		t.Fatalf("GetByID failed: %v", err)
-	}
-	if got.RoleName != "admin" {
-		t.Errorf("expected joined RoleName 'admin', got %q", got.RoleName)
-	}
-}
-
-func TestUserRepository_SetRole(t *testing.T) {
-	db := testDB(t)
-	defer db.Close()
-	projectRepo := NewProjectRepository(db)
-	userRepo := NewUserRepository(db)
-
-	p := &models.Project{ID: uuid.NewString(), Name: "SetRole Test", CreatedAt: time.Now().UTC()}
-	_ = projectRepo.Create(context.Background(), p)
-
-	roleID := int16(1) // user
-	u := &models.User{
-		ID: uuid.NewString(), Name: "Test", Username: "u-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", PasswordHash: "hash",
-		ProjectID: &p.ID, RoleID: &roleID,
-		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
-	}
-	_ = userRepo.Create(context.Background(), u)
-
-	if err := userRepo.SetRole(context.Background(), u.ID, 2); err != nil {
-		t.Fatalf("SetRole failed: %v", err)
-	}
-
-	got, err := userRepo.GetByID(context.Background(), u.ID)
-	if err != nil {
-		t.Fatalf("GetByID failed: %v", err)
-	}
-	if got.RoleName != "admin" {
-		t.Errorf("expected role promoted to admin, got %q", got.RoleName)
-	}
-}
-
-func TestUserRepository_GetByUsernameOrEmail(t *testing.T) {
-	db := testDB(t)
-	defer db.Close()
-	projectRepo := NewProjectRepository(db)
-	userRepo := NewUserRepository(db)
-
-	// Create a test project
-	p := &models.Project{ID: uuid.NewString(), Name: "GetByUsernameOrEmail Test", CreatedAt: time.Now().UTC()}
-	if err := projectRepo.Create(context.Background(), p); err != nil {
-		t.Fatalf("Create project failed: %v", err)
-	}
-
-	// Create a test user
-	roleID := int16(2) // admin
-	testUsername := "testuser-" + uuid.NewString()
-	testEmail := uuid.NewString() + "@example.com"
-	u := &models.User{
-		ID: uuid.NewString(), Name: "Test User", Username: testUsername,
-		Email: testEmail, PasswordHash: "hash",
-		ProjectID: &p.ID, RoleID: &roleID,
-		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
-	}
-	if err := userRepo.Create(context.Background(), u); err != nil {
-		t.Fatalf("Create user failed: %v", err)
-	}
-
-	// Test 1: Find by username
-	got, err := userRepo.GetByUsernameOrEmail(context.Background(), testUsername)
-	if err != nil {
-		t.Fatalf("GetByUsernameOrEmail with username failed: %v", err)
-	}
-	if got.ID != u.ID {
-		t.Errorf("expected user ID %q, got %q", u.ID, got.ID)
-	}
-	if got.Username != testUsername {
-		t.Errorf("expected username %q, got %q", testUsername, got.Username)
-	}
-	if got.RoleName != "admin" {
-		t.Errorf("expected RoleName 'admin', got %q", got.RoleName)
-	}
-
-	// Test 2: Find by email
-	got, err = userRepo.GetByUsernameOrEmail(context.Background(), testEmail)
-	if err != nil {
-		t.Fatalf("GetByUsernameOrEmail with email failed: %v", err)
-	}
-	if got.ID != u.ID {
-		t.Errorf("expected user ID %q, got %q", u.ID, got.ID)
-	}
-	if got.Email != testEmail {
-		t.Errorf("expected email %q, got %q", testEmail, got.Email)
-	}
-	if got.RoleName != "admin" {
-		t.Errorf("expected RoleName 'admin', got %q", got.RoleName)
-	}
-
-	// Test 3: Nonexistent identifier should return ErrUserNotFound
-	_, err = userRepo.GetByUsernameOrEmail(context.Background(), "nonexistent-"+uuid.NewString())
-	if err != ErrUserNotFound {
-		t.Errorf("expected ErrUserNotFound, got %v", err)
-	}
-}
-
-func TestUserRepository_ListAll(t *testing.T) {
-	db := testDB(t)
-	defer db.Close()
-	projectRepo := NewProjectRepository(db)
-	userRepo := NewUserRepository(db)
-
-	p1 := &models.Project{ID: uuid.NewString(), Name: "ListAll A " + uuid.NewString(), CreatedAt: time.Now().UTC()}
-	p2 := &models.Project{ID: uuid.NewString(), Name: "ListAll B " + uuid.NewString(), CreatedAt: time.Now().UTC()}
-	if err := projectRepo.Create(context.Background(), p1); err != nil {
-		t.Fatalf("create p1 failed: %v", err)
-	}
-	if err := projectRepo.Create(context.Background(), p2); err != nil {
-		t.Fatalf("create p2 failed: %v", err)
-	}
-
-	adminRoleID := int16(2)
-	u1 := &models.User{
-		ID: uuid.NewString(), Name: "P1 User", Username: "listall-p1-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", PasswordHash: "hash",
-		ProjectID: &p1.ID, RoleID: &adminRoleID,
-		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
-	}
-	u2 := &models.User{
-		ID: uuid.NewString(), Name: "P2 User", Username: "listall-p2-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", PasswordHash: "hash",
-		ProjectID: &p2.ID, RoleID: &adminRoleID,
-		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
-	}
-	for _, u := range []*models.User{u1, u2} {
-		if err := userRepo.Create(context.Background(), u); err != nil {
-			t.Fatalf("create user failed: %v", err)
-		}
-	}
-
-	got, err := userRepo.ListAll(context.Background())
-	if err != nil {
-		t.Fatalf("ListAll failed: %v", err)
-	}
-
-	byID := map[string]models.User{}
-	for _, u := range got {
-		byID[u.ID] = u
-	}
-
-	found1, ok := byID[u1.ID]
-	if !ok {
-		t.Fatalf("expected u1 in ListAll result")
-	}
-	if found1.ProjectName != p1.Name {
-		t.Errorf("expected u1.ProjectName %q, got %q", p1.Name, found1.ProjectName)
-	}
-
-	found2, ok := byID[u2.ID]
-	if !ok {
-		t.Fatalf("expected u2 in ListAll result")
-	}
-	if found2.ProjectName != p2.Name {
-		t.Errorf("expected u2.ProjectName %q, got %q", p2.Name, found2.ProjectName)
-	}
-}
-
-func TestUserRepository_ListByProject(t *testing.T) {
-	db := testDB(t)
-	defer db.Close()
-	projectRepo := NewProjectRepository(db)
-	userRepo := NewUserRepository(db)
-
-	p1 := &models.Project{ID: uuid.NewString(), Name: "ListByProject A " + uuid.NewString(), CreatedAt: time.Now().UTC()}
-	p2 := &models.Project{ID: uuid.NewString(), Name: "ListByProject B " + uuid.NewString(), CreatedAt: time.Now().UTC()}
-	if err := projectRepo.Create(context.Background(), p1); err != nil {
-		t.Fatalf("create p1 failed: %v", err)
-	}
-	if err := projectRepo.Create(context.Background(), p2); err != nil {
-		t.Fatalf("create p2 failed: %v", err)
-	}
-
-	adminRoleID := int16(2)
-	userRoleID := int16(1)
-	u1 := &models.User{
-		ID: uuid.NewString(), Name: "P1 Admin", Username: "p1admin-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", PasswordHash: "hash",
-		ProjectID: &p1.ID, RoleID: &adminRoleID,
-		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
-	}
-	u2 := &models.User{
-		ID: uuid.NewString(), Name: "P1 Member", Username: "p1member-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", PasswordHash: "hash",
-		ProjectID: &p1.ID, RoleID: &userRoleID,
-		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
-	}
-	u3 := &models.User{
-		ID: uuid.NewString(), Name: "P2 Admin", Username: "p2admin-" + uuid.NewString(),
-		Email: uuid.NewString() + "@example.com", PasswordHash: "hash",
-		ProjectID: &p2.ID, RoleID: &adminRoleID,
-		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
-	}
-	for _, u := range []*models.User{u1, u2, u3} {
-		if err := userRepo.Create(context.Background(), u); err != nil {
-			t.Fatalf("create user failed: %v", err)
-		}
-	}
-
-	got, err := userRepo.ListByProject(context.Background(), p1.ID)
-	if err != nil {
-		t.Fatalf("ListByProject failed: %v", err)
-	}
-	if len(got) != 2 {
-		t.Fatalf("expected 2 users in project p1, got %d", len(got))
-	}
-	ids := map[string]bool{}
-	for _, u := range got {
-		ids[u.ID] = true
-		if u.RoleName == "" {
-			t.Errorf("expected joined RoleName to be populated for user %s, got empty", u.ID)
-		}
-	}
-	if !ids[u1.ID] || !ids[u2.ID] {
-		t.Errorf("expected p1's two users in result, got ids: %v", ids)
-	}
-	if ids[u3.ID] {
-		t.Errorf("did not expect p2's user in p1's result")
-	}
-}
-
-func TestRoleRepository_List(t *testing.T) {
-	db := testDB(t)
-	defer db.Close()
-	repo := NewRoleRepository(db)
-
-	roles, err := repo.List(context.Background())
+	all, err := repo.List(context.Background())
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
-	if len(roles) != 3 {
-		t.Fatalf("expected 3 seeded roles, got %d", len(roles))
+	found := false
+	for _, p2 := range all {
+		if p2.ID == p.ID {
+			found = true
+		}
 	}
-	byName := map[string]int16{}
-	for _, r := range roles {
-		byName[r.Name] = r.ID
+	if !found {
+		t.Error("expected created product in List result")
 	}
-	if byName["user"] != 1 {
-		t.Errorf("expected 'user' role id 1, got %d", byName["user"])
+}
+
+func TestSubscriptionRepository_UpsertAndGet(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	userRepo := NewUserRepository(db)
+	productRepo := NewProductRepository(db)
+	subRepo := NewSubscriptionRepository(db)
+
+	u := createTestUser(t, userRepo, 3)
+	p := &models.Product{ID: uuid.NewString(), Name: "Sub Product " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	if err := productRepo.Create(context.Background(), p); err != nil {
+		t.Fatalf("create product failed: %v", err)
 	}
-	if byName["admin"] != 2 {
-		t.Errorf("expected 'admin' role id 2, got %d", byName["admin"])
+
+	now := time.Now().UTC()
+	sub := &models.Subscription{ID: uuid.NewString(), UserID: u.ID, ProductID: p.ID, Subscripted: false, Renewed: false, CreatedAt: now, UpdatedAt: now}
+	if err := subRepo.Upsert(context.Background(), sub); err != nil {
+		t.Fatalf("initial upsert failed: %v", err)
 	}
-	if byName["superadmin"] != 3 {
-		t.Errorf("expected 'superadmin' role id 3, got %d", byName["superadmin"])
+
+	got, err := subRepo.GetByUserAndProduct(context.Background(), u.ID, p.ID)
+	if err != nil {
+		t.Fatalf("GetByUserAndProduct failed: %v", err)
+	}
+	if got.Subscripted {
+		t.Error("expected Subscripted=false initially")
+	}
+
+	sub.Subscripted = true
+	sub.UpdatedAt = time.Now().UTC()
+	if err := subRepo.Upsert(context.Background(), sub); err != nil {
+		t.Fatalf("update upsert failed: %v", err)
+	}
+
+	got, err = subRepo.GetByUserAndProduct(context.Background(), u.ID, p.ID)
+	if err != nil {
+		t.Fatalf("GetByUserAndProduct after update failed: %v", err)
+	}
+	if !got.Subscripted {
+		t.Error("expected Subscripted=true after upsert update")
+	}
+
+	_, err = subRepo.GetByUserAndProduct(context.Background(), u.ID, uuid.NewString())
+	if err != ErrSubscriptionNotFound {
+		t.Errorf("expected ErrSubscriptionNotFound, got %v", err)
 	}
 }
