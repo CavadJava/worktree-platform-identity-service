@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"platform-identity-service/internal/repository"
 	"platform-identity-service/internal/service"
 )
 
@@ -18,32 +17,30 @@ func NewAuthHandler(svc *service.AuthService) *AuthHandler {
 }
 
 type registerRequest struct {
-	ProjectID string `json:"project_id"`
-	Name      string `json:"name"`
-	Username  string `json:"username"`
-	Email     string `json:"email"`
-	Password  string `json:"password"`
+	Name     string `json:"name"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type userResponse struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Username  string `json:"username"`
-	Email     string `json:"email"`
-	ProjectID string `json:"project_id,omitempty"`
-	Role      string `json:"role"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Username   string `json:"username"`
+	Email      string `json:"email"`
+	SystemRole string `json:"system_role"`
+	Status     string `json:"status"`
 }
 
 // Register godoc
-// @Summary      Register a user under a project
-// @Description  Layihənin ilk qeydiyyatdan keçən useri avtomatik 'admin' olur, sonrakılar 'user'. role sahəsi qəbul edilmir — client özünü admin edə bilməz.
+// @Summary      Register a Teslahubs account
+// @Description  Always creates system role 'user' with no shop membership — shop_role sahəsi qəbul edilmir.
 // @Tags         auth
 // @Accept       json
 // @Produce      json
 // @Param        request body registerRequest true "Register payload"
 // @Success      201 {object} userResponse
 // @Failure      400 {object} map[string]string
-// @Failure      404 {object} map[string]string
 // @Failure      409 {object} map[string]string
 // @Router       /auth/register [post]
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -52,18 +49,16 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.ProjectID == "" || req.Username == "" || req.Email == "" || req.Password == "" {
-		writeError(w, http.StatusBadRequest, "project_id, username, email and password are required")
+	if req.Username == "" || req.Email == "" || req.Password == "" {
+		writeError(w, http.StatusBadRequest, "username, email and password are required")
 		return
 	}
 
 	u, err := h.svc.Register(r.Context(), service.RegisterInput{
-		ProjectID: req.ProjectID, Name: req.Name, Username: req.Username, Email: req.Email, Password: req.Password,
+		Name: req.Name, Username: req.Username, Email: req.Email, Password: req.Password,
 	})
 	if err != nil {
 		switch {
-		case errors.Is(err, repository.ErrProjectNotFound):
-			writeError(w, http.StatusNotFound, "project not found")
 		case errors.Is(err, service.ErrUsernameTaken):
 			writeError(w, http.StatusConflict, "username already registered")
 		case errors.Is(err, service.ErrEmailTaken):
@@ -74,12 +69,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectID := ""
-	if u.ProjectID != nil {
-		projectID = *u.ProjectID
-	}
 	writeJSON(w, http.StatusCreated, userResponse{
-		ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email, ProjectID: projectID, Role: u.RoleName,
+		ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email,
+		SystemRole: u.SystemRoleName, Status: u.Status,
 	})
 }
 

@@ -14,16 +14,17 @@ import (
 )
 
 type UserHandler struct {
-	svc *service.UserService
+	svc           *service.UserService
+	membershipSvc *service.ShopMembershipService
 }
 
-func NewUserHandler(svc *service.UserService) *UserHandler {
-	return &UserHandler{svc: svc}
+func NewUserHandler(svc *service.UserService, membershipSvc *service.ShopMembershipService) *UserHandler {
+	return &UserHandler{svc: svc, membershipSvc: membershipSvc}
 }
 
 // Get godoc
 // @Summary      Get a user
-// @Description  Özünü, ya da (admin rolunda olarsa) öz layihəsindəki istənilən useri görə bilər.
+// @Description  Özünü, ya da (superadmin olarsa) istənilən useri görə bilər.
 // @Tags         users
 // @Produce      json
 // @Security     BearerAuth
@@ -44,105 +45,13 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeUserOrError(w, u, err)
 }
 
-type setRoleRequest struct {
-	Role string `json:"role"`
-}
-
-// SetRole godoc
-// @Summary      Change a user's role
-// @Description  Yalnız caller öz layihəsinin admin-idirsə icazə verilir.
-// @Tags         users
-// @Accept       json
-// @Produce      json
-// @Security     BearerAuth
-// @Param        id path string true "User ID"
-// @Param        request body setRoleRequest true "Role payload"
-// @Success      200 {object} userResponse
-// @Failure      403 {object} map[string]string
-// @Failure      404 {object} map[string]string
-// @Router       /users/{id}/role [post]
-func (h *UserHandler) SetRole(w http.ResponseWriter, r *http.Request) {
-	caller, ok := middleware.CallerFromContext(r.Context())
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
-		return
-	}
-
-	var req setRoleRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if req.Role != models.RoleUser && req.Role != models.RoleAdmin {
-		writeError(w, http.StatusBadRequest, "role must be 'user' or 'admin'")
-		return
-	}
-
-	id := chi.URLParam(r, "id")
-	u, err := h.svc.SetRole(r.Context(), caller, id, req.Role)
-	writeUserOrError(w, u, err)
-}
-
-type projectUserResponse struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Role     string `json:"role"`
-}
-
-// ListByProject godoc
-// @Summary      List a project's users
-// @Description  Caller həmin layihənin admin-i olmalıdır.
-// @Tags         users
-// @Produce      json
-// @Security     BearerAuth
-// @Param        id path string true "Project ID"
-// @Success      200 {array} projectUserResponse
-// @Failure      403 {object} map[string]string
-// @Router       /projects/{id}/users [get]
-func (h *UserHandler) ListByProject(w http.ResponseWriter, r *http.Request) {
-	caller, ok := middleware.CallerFromContext(r.Context())
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
-		return
-	}
-
-	projectID := chi.URLParam(r, "id")
-	users, err := h.svc.ListByProject(r.Context(), caller, projectID)
-	if err != nil {
-		if errors.Is(err, service.ErrForbidden) {
-			writeError(w, http.StatusForbidden, "admin role within this project required")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "failed to list users")
-		return
-	}
-
-	response := make([]projectUserResponse, len(users))
-	for i, u := range users {
-		response[i] = projectUserResponse{ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email, Role: u.RoleName}
-	}
-	writeJSON(w, http.StatusOK, response)
-}
-
-type allUsersResponse struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Username    string `json:"username"`
-	Email       string `json:"email"`
-	Role        string `json:"role"`
-	ProjectID   string `json:"project_id,omitempty"`
-	ProjectName string `json:"project_name,omitempty"`
-}
-
 // ListAll godoc
-// @Summary      List every user across every project
+// @Summary      List every Teslahubs user
 // @Description  Yalnız superadmin çağıra bilər.
 // @Tags         users
 // @Produce      json
 // @Security     BearerAuth
-// @Success      200 {array} allUsersResponse
+// @Success      200 {array} userResponse
 // @Failure      403 {object} map[string]string
 // @Router       /users [get]
 func (h *UserHandler) ListAll(w http.ResponseWriter, r *http.Request) {
@@ -154,26 +63,138 @@ func (h *UserHandler) ListAll(w http.ResponseWriter, r *http.Request) {
 
 	users, err := h.svc.ListAll(r.Context(), caller)
 	if err != nil {
-		if errors.Is(err, service.ErrForbidden) {
-			writeError(w, http.StatusForbidden, "superadmin role required")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "failed to list users")
+		writeUserServiceError(w, err)
 		return
 	}
 
-	response := make([]allUsersResponse, len(users))
+	response := make([]userResponse, len(users))
 	for i, u := range users {
-		projectID := ""
-		if u.ProjectID != nil {
-			projectID = *u.ProjectID
-		}
-		response[i] = allUsersResponse{
-			ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email, Role: u.RoleName,
-			ProjectID: projectID, ProjectName: u.ProjectName,
-		}
+		response[i] = userResponse{ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email, SystemRole: u.SystemRoleName, Status: u.Status}
 	}
 	writeJSON(w, http.StatusOK, response)
+}
+
+type setSystemRoleRequest struct {
+	SystemRole string `json:"system_role"`
+}
+
+// SetSystemRole godoc
+// @Summary      Change a user's system role
+// @Description  Yalnız superadmin çağıra bilər.
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "User ID"
+// @Param        request body setSystemRoleRequest true "Role payload"
+// @Success      200 {object} userResponse
+// @Failure      403 {object} map[string]string
+// @Router       /users/{id}/system-role [post]
+func (h *UserHandler) SetSystemRole(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req setSystemRoleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.SystemRole != models.SystemRoleSuperadmin && req.SystemRole != models.SystemRoleAdmin && req.SystemRole != models.SystemRoleUser {
+		writeError(w, http.StatusBadRequest, "system_role must be 'superadmin', 'admin', or 'user'")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	u, err := h.svc.SetSystemRole(r.Context(), caller, id, req.SystemRole)
+	writeUserOrError(w, u, err)
+}
+
+type setStatusRequest struct {
+	Status string `json:"status"`
+}
+
+// SetStatus godoc
+// @Summary      Activate or deactivate a user
+// @Description  Yalnız superadmin çağıra bilər.
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "User ID"
+// @Param        request body setStatusRequest true "Status payload"
+// @Success      200 {object} userResponse
+// @Failure      403 {object} map[string]string
+// @Router       /users/{id}/status [post]
+func (h *UserHandler) SetStatus(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req setStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Status != models.UserStatusActive && req.Status != models.UserStatusInActive {
+		writeError(w, http.StatusBadRequest, "status must be 'ACTIVE' or 'IN_ACTIVE'")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	u, err := h.svc.SetStatus(r.Context(), caller, id, req.Status)
+	writeUserOrError(w, u, err)
+}
+
+// ListMyShops godoc
+// @Summary      List the shops a user belongs to
+// @Description  Özünü, ya da (superadmin olarsa) istənilən useri görə bilər.
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "User ID"
+// @Success      200 {array} memberResponse
+// @Failure      403 {object} map[string]string
+// @Router       /users/{id}/shops [get]
+func (h *UserHandler) ListMyShops(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	userID := chi.URLParam(r, "id")
+	if caller.UserID != userID && caller.SystemRole != models.SystemRoleSuperadmin {
+		writeError(w, http.StatusForbidden, "self or superadmin required")
+		return
+	}
+
+	memberships, err := h.membershipSvc.ListMyShops(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list shops")
+		return
+	}
+
+	response := make([]memberResponse, len(memberships))
+	for i := range memberships {
+		response[i] = toMemberResponse(&memberships[i])
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+func writeUserServiceError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, service.ErrForbidden):
+		writeError(w, http.StatusForbidden, "superadmin role required")
+	case errors.Is(err, service.ErrInvalidSystemRole), errors.Is(err, service.ErrInvalidStatus):
+		writeError(w, http.StatusBadRequest, err.Error())
+	default:
+		writeError(w, http.StatusInternalServerError, "failed to process request")
+	}
 }
 
 func writeUserOrError(w http.ResponseWriter, u *models.User, err error) {
@@ -181,19 +202,12 @@ func writeUserOrError(w http.ResponseWriter, u *models.User, err error) {
 		switch {
 		case errors.Is(err, repository.ErrUserNotFound):
 			writeError(w, http.StatusNotFound, "user not found")
-		case errors.Is(err, service.ErrForbidden):
-			writeError(w, http.StatusForbidden, "admin role within the target's own project required")
 		default:
-			writeError(w, http.StatusInternalServerError, "failed to process request")
+			writeUserServiceError(w, err)
 		}
 		return
 	}
-
-	projectID := ""
-	if u.ProjectID != nil {
-		projectID = *u.ProjectID
-	}
 	writeJSON(w, http.StatusOK, userResponse{
-		ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email, ProjectID: projectID, Role: u.RoleName,
+		ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email, SystemRole: u.SystemRoleName, Status: u.Status,
 	})
 }

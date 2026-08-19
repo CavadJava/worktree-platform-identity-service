@@ -6,17 +6,21 @@ import (
 	"strings"
 
 	"platform-identity-service/internal/auth"
-	"platform-identity-service/internal/service/roleassign"
+	"platform-identity-service/internal/models"
+	"platform-identity-service/internal/repository"
+	"platform-identity-service/internal/service/shopassign"
 )
 
 type contextKey string
 
 const callerKey contextKey = "caller"
 
-// RequireAuth verifies the token locally against this service's own
-// JWTManager — no remote authorization-service call, since this service
-// is meant to be a self-contained identity provider for new projects.
-func RequireAuth(jwt *auth.JWTManager) func(http.Handler) http.Handler {
+// RequireAuth verifies the token locally, then re-checks the caller's
+// current status in the database — a status change (e.g. an admin
+// deactivating a user) must take effect on the user's very next request,
+// not just at their next login, so this cannot rely on the JWT's claims
+// alone.
+func RequireAuth(jwt *auth.JWTManager, userRepo *repository.UserRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			header := r.Header.Get("Authorization")
@@ -32,15 +36,25 @@ func RequireAuth(jwt *auth.JWTManager) func(http.Handler) http.Handler {
 				return
 			}
 
-			caller := roleassign.Caller{UserID: claims.UserID, ProjectID: claims.ProjectID, Role: claims.Role}
+			user, err := userRepo.GetByID(r.Context(), claims.UserID)
+			if err != nil {
+				writeAuthError(w, http.StatusUnauthorized, "unauthorized", "invalid or expired token")
+				return
+			}
+			if user.Status != models.UserStatusActive {
+				writeAuthError(w, http.StatusUnauthorized, "unauthorized", "account is deactivated")
+				return
+			}
+
+			caller := shopassign.Caller{UserID: claims.UserID, SystemRole: claims.SystemRole}
 			ctx := context.WithValue(r.Context(), callerKey, caller)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
-func CallerFromContext(ctx context.Context) (roleassign.Caller, bool) {
-	caller, ok := ctx.Value(callerKey).(roleassign.Caller)
+func CallerFromContext(ctx context.Context) (shopassign.Caller, bool) {
+	caller, ok := ctx.Value(callerKey).(shopassign.Caller)
 	return caller, ok
 }
 
