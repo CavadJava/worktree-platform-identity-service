@@ -192,6 +192,41 @@ func TestShopMembershipService_ListMembers(t *testing.T) {
 	}
 }
 
+func TestShopMembershipService_ListMembers_PlainShopUserCanView(t *testing.T) {
+	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
+
+	shop, err := shopSvc.Create(context.Background(), "ListMembers ShopUser Test "+uuid.NewString())
+	if err != nil {
+		t.Fatalf("create shop failed: %v", err)
+	}
+	member, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Member", Username: "member-view-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register member failed: %v", err)
+	}
+
+	superadminCaller := shopassign.Caller{UserID: "superadmin-id", SystemRole: models.SystemRoleSuperadmin}
+	if _, err := membershipSvc.AddMember(context.Background(), superadminCaller, shop.ID, member.ID, models.ShopRoleUser); err != nil {
+		t.Fatalf("AddMember failed: %v", err)
+	}
+
+	// A plain shop-user (not shop-admin) can view the member list, even
+	// though they can't manage it (AddMember/SetMemberRole stay shop-admin-only).
+	memberCaller := shopassign.Caller{UserID: member.ID, SystemRole: models.SystemRoleUser}
+	members, err := membershipSvc.ListMembers(context.Background(), memberCaller, shop.ID)
+	if err != nil {
+		t.Fatalf("ListMembers as shop-user failed: %v", err)
+	}
+	if len(members) != 1 {
+		t.Fatalf("expected 1 member, got %d", len(members))
+	}
+
+	if _, err := membershipSvc.SetMemberRole(context.Background(), memberCaller, shop.ID, member.ID, models.ShopRoleAdmin); err != ErrForbidden {
+		t.Errorf("expected shop-user to be forbidden from SetMemberRole, got %v", err)
+	}
+}
+
 func TestShopMembershipService_SetMemberRole(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 

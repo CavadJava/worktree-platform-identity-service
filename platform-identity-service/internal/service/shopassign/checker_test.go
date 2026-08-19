@@ -48,3 +48,46 @@ func TestCanManageShop(t *testing.T) {
 		})
 	}
 }
+
+func TestCanViewShop(t *testing.T) {
+	tests := []struct {
+		name       string
+		caller     Caller
+		membership *models.ShopMembership
+		want       bool
+	}{
+		{
+			name:       "superadmin can view any shop, even with no membership",
+			caller:     Caller{UserID: "u1", SystemRole: "superadmin"},
+			membership: nil,
+			want:       true,
+		},
+		{
+			name:       "shop-admin member can view their own shop",
+			caller:     Caller{UserID: "u1", SystemRole: "user"},
+			membership: &models.ShopMembership{UserID: "u1", ShopID: "s1", ShopRoleName: "shop-admin"},
+			want:       true,
+		},
+		{
+			name:       "shop-user member can also view their own shop",
+			caller:     Caller{UserID: "u1", SystemRole: "user"},
+			membership: &models.ShopMembership{UserID: "u1", ShopID: "s1", ShopRoleName: "shop-user"},
+			want:       true,
+		},
+		{
+			name:       "non-member, non-superadmin cannot view the shop",
+			caller:     Caller{UserID: "u1", SystemRole: "user"},
+			membership: nil,
+			want:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CanViewShop(tt.caller, tt.membership)
+			if got != tt.want {
+				t.Errorf("CanViewShop(%+v, %+v) = %v, want %v", tt.caller, tt.membership, got, tt.want)
+			}
+		})
+	}
+}

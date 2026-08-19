@@ -23,3 +23,14 @@ func CanManageShop(caller Caller, membership *models.ShopMembership) bool {
 	}
 	return membership.ShopRoleName == models.ShopRoleAdmin
 }
+
+// CanViewShop reports whether caller may see the shop's member list,
+// without necessarily being able to change it. Both shop-admin and
+// shop-user membership qualify — a plain member should be able to see
+// who else is in their own shop, unlike CanManageShop's admin-only bar.
+func CanViewShop(caller Caller, membership *models.ShopMembership) bool {
+	if CanManageShop(caller, membership) {
+		return true
+	}
+	return membership != nil && membership.ShopRoleName == models.ShopRoleUser
+}

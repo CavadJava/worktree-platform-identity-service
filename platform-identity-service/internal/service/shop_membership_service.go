@@ -34,24 +34,44 @@ func NewShopMembershipService(membershipRepo *repository.ShopMembershipRepositor
 	return &ShopMembershipService{membershipRepo: membershipRepo, userRepo: userRepo, shopRepo: shopRepo, authSvc: authSvc}
 }
 
-// authorize fetches caller's own membership row for shopID (nil if none)
-// and evaluates shopassign.CanManageShop against it. Superadmins skip the
-// membership lookup entirely — CanManageShop always allows them regardless
-// of membership, and a superadmin caller's UserID is not guaranteed to be
-// a real user_shop_memberships row (or even a valid UUID).
-func (s *ShopMembershipService) authorize(ctx context.Context, caller shopassign.Caller, shopID string) error {
+// callerMembership fetches caller's own membership row for shopID, or nil
+// if they have none — shared by authorize and authorizeView below.
+// Superadmins skip the lookup entirely — both shopassign checks always
+// allow them regardless of membership, and a superadmin caller's UserID
+// is not guaranteed to be a real user_shop_memberships row (or even a
+// valid UUID).
+func (s *ShopMembershipService) callerMembership(ctx context.Context, caller shopassign.Caller, shopID string) (*models.ShopMembership, error) {
 	if caller.SystemRole == models.SystemRoleSuperadmin {
-		return nil
+		return nil, nil
 	}
+	m, err := s.membershipRepo.GetByUserAndShop(ctx, caller.UserID, shopID)
+	if errors.Is(err, repository.ErrMembershipNotFound) {
+		return nil, nil
+	}
+	return m, err
+}
 
-	callerMembership, err := s.membershipRepo.GetByUserAndShop(ctx, caller.UserID, shopID)
-	if err != nil && !errors.Is(err, repository.ErrMembershipNotFound) {
+// authorize gates management actions (add/remove/change-role) — only a
+// superadmin or that shop's own shop-admin passes.
+func (s *ShopMembershipService) authorize(ctx context.Context, caller shopassign.Caller, shopID string) error {
+	m, err := s.callerMembership(ctx, caller, shopID)
+	if err != nil {
 		return err
 	}
-	if errors.Is(err, repository.ErrMembershipNotFound) {
-		callerMembership = nil
+	if !shopassign.CanManageShop(caller, m) {
+		return ErrForbidden
 	}
-	if !shopassign.CanManageShop(caller, callerMembership) {
+	return nil
+}
+
+// authorizeView gates read-only access (listing members) — a plain
+// shop-user of that shop passes too, not just shop-admin/superadmin.
+func (s *ShopMembershipService) authorizeView(ctx context.Context, caller shopassign.Caller, shopID string) error {
+	m, err := s.callerMembership(ctx, caller, shopID)
+	if err != nil {
+		return err
+	}
+	if !shopassign.CanViewShop(caller, m) {
 		return ErrForbidden
 	}
 	return nil
@@ -117,7 +137,7 @@ func (s *ShopMembershipService) AddNewMember(ctx context.Context, caller shopass
 }
 
 func (s *ShopMembershipService) ListMembers(ctx context.Context, caller shopassign.Caller, shopID string) ([]models.ShopMembership, error) {
-	if err := s.authorize(ctx, caller, shopID); err != nil {
+	if err := s.authorizeView(ctx, caller, shopID); err != nil {
 		return nil, err
 	}
 	return s.membershipRepo.ListByShop(ctx, shopID)
