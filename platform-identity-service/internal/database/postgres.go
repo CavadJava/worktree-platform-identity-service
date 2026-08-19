@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -32,6 +33,26 @@ func Connect(cfg *config.Config) (*sql.DB, error) {
 }
 
 func Migrate(db *sql.DB) error {
+	var usersTableExists bool
+	if err := db.QueryRow(`
+		SELECT EXISTS (
+			SELECT FROM information_schema.tables
+			WHERE table_name = 'users' AND table_schema = current_schema()
+		)
+	`).Scan(&usersTableExists); err != nil {
+		return fmt.Errorf("check existing users table: %w", err)
+	}
+
+	if usersTableExists {
+		var userCount int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&userCount); err != nil {
+			return fmt.Errorf("count existing users: %w", err)
+		}
+		if userCount > 0 && os.Getenv("ALLOW_DESTRUCTIVE_MIGRATE") != "true" {
+			return fmt.Errorf("refusing to run destructive migration against a database with existing user data — set ALLOW_DESTRUCTIVE_MIGRATE=true to override")
+		}
+	}
+
 	_, err := db.Exec(`
 		DROP TABLE IF EXISTS user_product_subscriptions;
 		DROP TABLE IF EXISTS products;

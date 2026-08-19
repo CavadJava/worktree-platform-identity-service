@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"platform-identity-service/internal/models"
+	"platform-identity-service/internal/repository"
 )
 
 func TestAuthService_Register_AlwaysCreatesPlainUser(t *testing.T) {
@@ -94,5 +95,29 @@ func TestAuthService_Login_WrongPassword(t *testing.T) {
 	_, _, err = authSvc.Login(context.Background(), LoginInput{Identifier: username, Password: "wrong-password"})
 	if err != ErrInvalidCredentials {
 		t.Errorf("expected ErrInvalidCredentials, got %v", err)
+	}
+}
+
+func TestAuthService_Login_InactiveUser(t *testing.T) {
+	db := testDB(t)
+	userRepo := repository.NewUserRepository(db)
+	jwt := newTestJWTManager()
+	authSvc := NewAuthService(userRepo, jwt)
+
+	username := "inactive-" + uuid.NewString()
+	u, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Inactive User", Username: username, Email: uuid.NewString() + "@example.com", Password: "correct-password",
+	})
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	if err := userRepo.SetStatus(context.Background(), u.ID, models.UserStatusInActive); err != nil {
+		t.Fatalf("SetStatus failed: %v", err)
+	}
+
+	_, _, err = authSvc.Login(context.Background(), LoginInput{Identifier: username, Password: "correct-password"})
+	if err != ErrInvalidCredentials {
+		t.Errorf("expected ErrInvalidCredentials for IN_ACTIVE user, got %v", err)
 	}
 }

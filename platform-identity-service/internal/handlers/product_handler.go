@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"platform-identity-service/internal/middleware"
+	"platform-identity-service/internal/models"
 	"platform-identity-service/internal/repository"
 	"platform-identity-service/internal/service"
 )
@@ -47,7 +48,7 @@ func (h *ProductHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	if caller.SystemRole != "superadmin" {
+	if caller.SystemRole != models.SystemRoleSuperadmin {
 		writeError(w, http.StatusForbidden, "superadmin role required")
 		return
 	}
@@ -138,7 +139,7 @@ type subscriptionResponse struct {
 
 // SetSubscription godoc
 // @Summary      Manually set a user's subscription to a product
-// @Description  Superadmin or admin only. No payment gateway integration.
+// @Description  Superadmin only. No payment gateway integration.
 // @Tags         products
 // @Accept       json
 // @Produce      json

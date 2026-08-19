@@ -66,7 +66,7 @@ func (s *ProductService) CheckAccess(ctx context.Context, userID, productID stri
 // user's subscription — there is no payment gateway integration in this
 // scope.
 func (s *ProductService) SetSubscription(ctx context.Context, caller shopassign.Caller, targetUserID, productID string, subscripted, renewed bool) (*models.Subscription, error) {
-	if caller.SystemRole != models.SystemRoleSuperadmin && caller.SystemRole != models.SystemRoleAdmin {
+	if caller.SystemRole != models.SystemRoleSuperadmin {
 		return nil, ErrForbidden
 	}
 	if _, err := s.productRepo.GetByID(ctx, productID); err != nil {

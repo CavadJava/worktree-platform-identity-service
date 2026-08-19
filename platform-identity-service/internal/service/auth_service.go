@@ -83,5 +83,9 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (string, time.Ti
 		return "", time.Time{}, ErrInvalidCredentials
 	}
 
+	if u.Status != models.UserStatusActive {
+		return "", time.Time{}, ErrInvalidCredentials
+	}
+
 	return s.jwt.Generate(u.ID, u.SystemRoleName)
 }
