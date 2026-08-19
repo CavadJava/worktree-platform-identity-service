@@ -45,13 +45,26 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeUserOrError(w, u, err)
 }
 
+// userWithShopsResponse extends userResponse with the shops the user
+// belongs to — an empty slice, not omitted, for a user with no shop
+// memberships, so the frontend never has to special-case a missing field.
+type userWithShopsResponse struct {
+	ID         string           `json:"id"`
+	Name       string           `json:"name"`
+	Username   string           `json:"username"`
+	Email      string           `json:"email"`
+	SystemRole string           `json:"system_role"`
+	Status     string           `json:"status"`
+	Shops      []memberResponse `json:"shops"`
+}
+
 // ListAll godoc
-// @Summary      List every Teslahubs user
+// @Summary      List every Teslahubs user, with their shop memberships
 // @Description  Yalnız superadmin çağıra bilər.
 // @Tags         users
 // @Produce      json
 // @Security     BearerAuth
-// @Success      200 {array} userResponse
+// @Success      200 {array} userWithShopsResponse
 // @Failure      403 {object} map[string]string
 // @Router       /users [get]
 func (h *UserHandler) ListAll(w http.ResponseWriter, r *http.Request) {
@@ -67,9 +80,22 @@ func (h *UserHandler) ListAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := make([]userResponse, len(users))
+	membershipsByUser, err := h.membershipSvc.ListAllGroupedByUser(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list shop memberships")
+		return
+	}
+
+	response := make([]userWithShopsResponse, len(users))
 	for i, u := range users {
-		response[i] = userResponse{ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email, SystemRole: u.SystemRoleName, Status: u.Status}
+		shops := make([]memberResponse, 0, len(membershipsByUser[u.ID]))
+		for _, m := range membershipsByUser[u.ID] {
+			shops = append(shops, toMemberResponse(&m))
+		}
+		response[i] = userWithShopsResponse{
+			ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email,
+			SystemRole: u.SystemRoleName, Status: u.Status, Shops: shops,
+		}
 	}
 	writeJSON(w, http.StatusOK, response)
 }

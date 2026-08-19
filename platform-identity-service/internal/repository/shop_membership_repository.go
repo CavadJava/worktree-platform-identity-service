@@ -99,6 +99,27 @@ func (r *ShopMembershipRepository) ListByUser(ctx context.Context, userID string
 	return memberships, rows.Err()
 }
 
+// ListAll returns every membership row across every shop — used to build
+// a "which shops does each user belong to" view without an N+1 query
+// (one call per user). Callers group by UserID themselves.
+func (r *ShopMembershipRepository) ListAll(ctx context.Context) ([]models.ShopMembership, error) {
+	rows, err := r.db.QueryContext(ctx, selectMembershipWithNames+" ORDER BY m.created_at")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	memberships := []models.ShopMembership{}
+	for rows.Next() {
+		var m models.ShopMembership
+		if err := rows.Scan(&m.ID, &m.UserID, &m.ShopID, &m.ShopName, &m.ShopRoleID, &m.ShopRoleName, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		memberships = append(memberships, m)
+	}
+	return memberships, rows.Err()
+}
+
 func (r *ShopMembershipRepository) Delete(ctx context.Context, userID, shopID string) error {
 	const q = `DELETE FROM user_shop_memberships WHERE user_id = $1 AND shop_id = $2`
 	result, err := r.db.ExecContext(ctx, q, userID, shopID)

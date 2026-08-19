@@ -184,6 +184,25 @@ definitions:
       username:
         type: string
     type: object
+  handlers.userWithShopsResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      shops:
+        items:
+          $ref: '#/definitions/handlers.memberResponse'
+        type: array
+      status:
+        type: string
+      system_role:
+        type: string
+      username:
+        type: string
+    type: object
 info:
   contact: {}
   description: 'Teslahubs-un mərkəzi identity modulu: istifadəçilər Shop-lara (many-to-many,
@@ -652,7 +671,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.userResponse'
+              $ref: '#/definitions/handlers.userWithShopsResponse'
             type: array
         "403":
           description: Forbidden
@@ -662,7 +681,7 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: List every Teslahubs user
+      summary: List every Teslahubs user, with their shop memberships
       tags:
       - users
     post:

@@ -727,14 +727,14 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "List every Teslahubs user",
+                "summary": "List every Teslahubs user, with their shop memberships",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.userResponse"
+                                "$ref": "#/definitions/handlers.userWithShopsResponse"
                             }
                         }
                     },
@@ -1416,6 +1416,35 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "system_role": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.userWithShopsResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "shops": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.memberResponse"
+                    }
                 },
                 "status": {
                     "type": "string"

@@ -203,3 +203,20 @@ func (s *ShopMembershipService) UpdateMemberProfile(ctx context.Context, caller 
 func (s *ShopMembershipService) ListMyShops(ctx context.Context, userID string) ([]models.ShopMembership, error) {
 	return s.membershipRepo.ListByUser(ctx, userID)
 }
+
+// ListAllGroupedByUser returns every membership across every shop, keyed
+// by user id — used to enrich the system-wide user list (UserHandler.ListAll)
+// with each user's shop memberships in one extra query, instead of an
+// N+1 lookup per user. Caller (superadmin-only, enforced by UserService.ListAll
+// before this is ever reached) is not re-checked here.
+func (s *ShopMembershipService) ListAllGroupedByUser(ctx context.Context) (map[string][]models.ShopMembership, error) {
+	all, err := s.membershipRepo.ListAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	grouped := make(map[string][]models.ShopMembership)
+	for _, m := range all {
+		grouped[m.UserID] = append(grouped[m.UserID], m)
+	}
+	return grouped, nil
+}

@@ -427,3 +427,43 @@ func TestShopMembershipService_ListMyShops(t *testing.T) {
 		t.Fatalf("expected 2 shop memberships, got %d", len(myShops))
 	}
 }
+
+func TestShopMembershipService_ListAllGroupedByUser(t *testing.T) {
+	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
+
+	shop, err := shopSvc.Create(context.Background(), "GroupedByUser Test "+uuid.NewString())
+	if err != nil {
+		t.Fatalf("create shop failed: %v", err)
+	}
+	withShop, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "With Shop", Username: "grouped-with-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register withShop failed: %v", err)
+	}
+	withoutShop, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Without Shop", Username: "grouped-without-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register withoutShop failed: %v", err)
+	}
+
+	superadminCaller := shopassign.Caller{UserID: "superadmin-id", SystemRole: models.SystemRoleSuperadmin}
+	if _, err := membershipSvc.AddMember(context.Background(), superadminCaller, shop.ID, withShop.ID, models.ShopRoleUser); err != nil {
+		t.Fatalf("AddMember failed: %v", err)
+	}
+
+	grouped, err := membershipSvc.ListAllGroupedByUser(context.Background())
+	if err != nil {
+		t.Fatalf("ListAllGroupedByUser failed: %v", err)
+	}
+	if len(grouped[withShop.ID]) != 1 {
+		t.Errorf("expected 1 membership for withShop, got %d", len(grouped[withShop.ID]))
+	}
+	if grouped[withShop.ID][0].ShopID != shop.ID {
+		t.Errorf("expected membership's ShopID %q, got %q", shop.ID, grouped[withShop.ID][0].ShopID)
+	}
+	if _, ok := grouped[withoutShop.ID]; ok {
+		t.Errorf("expected no entry for withoutShop (user with no shop memberships), got %v", grouped[withoutShop.ID])
+	}
+}
