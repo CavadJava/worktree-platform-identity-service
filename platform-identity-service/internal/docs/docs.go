@@ -59,7 +59,7 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
-                "description": "Layihənin ilk qeydiyyatdan keçən useri avtomatik 'admin' olur, sonrakılar 'user'. role sahəsi qəbul edilmir — client özünü admin edə bilməz.",
+                "description": "Always creates system role 'user' with no shop membership — shop_role sahəsi qəbul edilmir.",
                 "consumes": [
                     "application/json"
                 ],
@@ -69,7 +69,7 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Register a user under a project",
+                "summary": "Register a Teslahubs account",
                 "parameters": [
                     {
                         "description": "Register payload",
@@ -97,15 +97,6 @@ const docTemplate = `{
                             }
                         }
                     },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
                     "409": {
                         "description": "Conflict",
                         "schema": {
@@ -118,29 +109,34 @@ const docTemplate = `{
                 }
             }
         },
-        "/projects": {
+        "/products": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "projects"
+                    "products"
                 ],
-                "summary": "List all projects",
+                "summary": "List all products",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.projectResponse"
+                                "$ref": "#/definitions/handlers.productResponse"
                             }
                         }
                     }
                 }
             },
             "post": {
-                "description": "Açıq endpoint — sistem-səviyyəli superadmin anlayışı hələ yoxdur, yeni layihə qurmaq istəyən istənilən kəs çağıra bilər.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Superadmin only.",
                 "consumes": [
                     "application/json"
                 ],
@@ -148,17 +144,17 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "projects"
+                    "products"
                 ],
-                "summary": "Register a new project",
+                "summary": "Create a product",
                 "parameters": [
                     {
-                        "description": "Project payload",
+                        "description": "Product payload",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.createProjectRequest"
+                            "$ref": "#/definitions/handlers.createProductRequest"
                         }
                     }
                 ],
@@ -166,7 +162,134 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.projectResponse"
+                            "$ref": "#/definitions/handlers.productResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/products/{id}/access": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns \"full\" if subscribed, \"demo\" otherwise.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "products"
+                ],
+                "summary": "Check the caller's access level to a product",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.accessResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/shop-roles": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "shop-roles"
+                ],
+                "summary": "List all shop roles",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.shopRoleResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/shops": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "shops"
+                ],
+                "summary": "List all shops",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.shopResponse"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "shops"
+                ],
+                "summary": "Register a new shop",
+                "parameters": [
+                    {
+                        "description": "Shop payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.createShopRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.shopResponse"
                         }
                     },
                     "400": {
@@ -181,19 +304,19 @@ const docTemplate = `{
                 }
             }
         },
-        "/projects/{id}": {
+        "/shops/{id}": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "projects"
+                    "shops"
                 ],
-                "summary": "Get a project by id",
+                "summary": "Get a shop by id",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Project ID",
+                        "description": "Shop ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -203,11 +326,238 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.projectResponse"
+                            "$ref": "#/definitions/handlers.shopResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/shops/{id}/members": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "shops"
+                ],
+                "summary": "List a shop's members",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Shop ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.memberResponse"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Caller must be superadmin or that shop's own shop-admin.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "shops"
+                ],
+                "summary": "Add an existing user to a shop",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Shop ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Member payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.addMemberRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.memberResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/shops/{id}/members/{userId}/role": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "shops"
+                ],
+                "summary": "Change a member's shop role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Shop ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "userId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Role payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.setMemberRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.memberResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/system-roles": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-roles"
+                ],
+                "summary": "List all system roles",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.systemRoleResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/users": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Yalnız superadmin çağıra bilər.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "List every Teslahubs user",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.userResponse"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -225,7 +575,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Özünü, ya da (admin rolunda olarsa) öz layihəsindəki istənilən useri görə bilər.",
+                "description": "Özünü, ya da (superadmin olarsa) istənilən useri görə bilər.",
                 "produces": [
                     "application/json"
                 ],
@@ -270,14 +620,60 @@ const docTemplate = `{
                 }
             }
         },
-        "/users/{id}/role": {
+        "/users/{id}/shops": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Özünü, ya da (superadmin olarsa) istənilən useri görə bilər.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "List the shops a user belongs to",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.memberResponse"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{id}/status": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Yalnız caller öz layihəsinin admin-idirsə icazə verilir.",
+                "description": "Yalnız superadmin çağıra bilər.",
                 "consumes": [
                     "application/json"
                 ],
@@ -287,7 +683,7 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Change a user's role",
+                "summary": "Activate or deactivate a user",
                 "parameters": [
                     {
                         "type": "string",
@@ -297,12 +693,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Role payload",
+                        "description": "Status payload",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.setRoleRequest"
+                            "$ref": "#/definitions/handlers.setStatusRequest"
                         }
                     }
                 ],
@@ -321,9 +717,117 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/users/{id}/system-role": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Yalnız superadmin çağıra bilər.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Change a user's system role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
                     },
-                    "404": {
-                        "description": "Not Found",
+                    {
+                        "description": "Role payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.setSystemRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.userResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{userId}/products/{productId}/subscribe": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Superadmin or admin only. No payment gateway integration.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "products"
+                ],
+                "summary": "Manually set a user's subscription to a product",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "userId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Product ID",
+                        "name": "productId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Subscription payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.setSubscriptionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.subscriptionResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -336,7 +840,34 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "handlers.createProjectRequest": {
+        "handlers.accessResponse": {
+            "type": "object",
+            "properties": {
+                "access": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.addMemberRequest": {
+            "type": "object",
+            "properties": {
+                "shop_role": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.createProductRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.createShopRequest": {
             "type": "object",
             "properties": {
                 "name": {
@@ -366,7 +897,30 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.projectResponse": {
+        "handlers.memberResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "shop_id": {
+                    "type": "string"
+                },
+                "shop_name": {
+                    "type": "string"
+                },
+                "shop_role": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.productResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -392,18 +946,95 @@ const docTemplate = `{
                 "password": {
                     "type": "string"
                 },
-                "project_id": {
-                    "type": "string"
-                },
                 "username": {
                     "type": "string"
                 }
             }
         },
-        "handlers.setRoleRequest": {
+        "handlers.setMemberRoleRequest": {
             "type": "object",
             "properties": {
-                "role": {
+                "shop_role": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.setStatusRequest": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.setSubscriptionRequest": {
+            "type": "object",
+            "properties": {
+                "renewed": {
+                    "type": "boolean"
+                },
+                "subscripted": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "handlers.setSystemRoleRequest": {
+            "type": "object",
+            "properties": {
+                "system_role": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.shopResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.shopRoleResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.subscriptionResponse": {
+            "type": "object",
+            "properties": {
+                "product_id": {
+                    "type": "string"
+                },
+                "renewed": {
+                    "type": "boolean"
+                },
+                "subscripted": {
+                    "type": "boolean"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.systemRoleResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
                     "type": "string"
                 }
             }
@@ -420,10 +1051,10 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
-                "project_id": {
+                "status": {
                     "type": "string"
                 },
-                "role": {
+                "system_role": {
                     "type": "string"
                 },
                 "username": {
@@ -443,12 +1074,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0",
+	Version:          "2.0",
 	Host:             "",
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
-	Title:            "Platform Identity Service API",
-	Description:      "Gələcək layihələr üçün mərkəzi User/Admin qeydiyyat modulu. Hər layihənin ilk qeydiyyatdan keçən useri avtomatik admin olur, sonrakılar user. Öz JWT-sini özü verir/yoxlayır.",
+	Title:            "Teslahubs Identity Service API",
+	Description:      "Teslahubs-un mərkəzi identity modulu: istifadəçilər Shop-lara (many-to-many, shop-admin/shop-user rolları ilə) üzv ola bilər və Product-lara (manual subscription) abunə ola bilər. Sistem rolları: superadmin/admin/user.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

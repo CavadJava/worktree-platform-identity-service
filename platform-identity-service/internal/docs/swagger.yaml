@@ -1,6 +1,23 @@
 basePath: /api/v1
 definitions:
-  handlers.createProjectRequest:
+  handlers.accessResponse:
+    properties:
+      access:
+        type: string
+    type: object
+  handlers.addMemberRequest:
+    properties:
+      shop_role:
+        type: string
+      user_id:
+        type: string
+    type: object
+  handlers.createProductRequest:
+    properties:
+      name:
+        type: string
+    type: object
+  handlers.createShopRequest:
     properties:
       name:
         type: string
@@ -19,7 +36,22 @@ definitions:
       token:
         type: string
     type: object
-  handlers.projectResponse:
+  handlers.memberResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      shop_id:
+        type: string
+      shop_name:
+        type: string
+      shop_role:
+        type: string
+      user_id:
+        type: string
+    type: object
+  handlers.productResponse:
     properties:
       created_at:
         type: string
@@ -36,14 +68,63 @@ definitions:
         type: string
       password:
         type: string
-      project_id:
-        type: string
       username:
         type: string
     type: object
-  handlers.setRoleRequest:
+  handlers.setMemberRoleRequest:
     properties:
-      role:
+      shop_role:
+        type: string
+    type: object
+  handlers.setStatusRequest:
+    properties:
+      status:
+        type: string
+    type: object
+  handlers.setSubscriptionRequest:
+    properties:
+      renewed:
+        type: boolean
+      subscripted:
+        type: boolean
+    type: object
+  handlers.setSystemRoleRequest:
+    properties:
+      system_role:
+        type: string
+    type: object
+  handlers.shopResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  handlers.shopRoleResponse:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  handlers.subscriptionResponse:
+    properties:
+      product_id:
+        type: string
+      renewed:
+        type: boolean
+      subscripted:
+        type: boolean
+      user_id:
+        type: string
+    type: object
+  handlers.systemRoleResponse:
+    properties:
+      id:
+        type: integer
+      name:
         type: string
     type: object
   handlers.userResponse:
@@ -54,20 +135,20 @@ definitions:
         type: string
       name:
         type: string
-      project_id:
+      status:
         type: string
-      role:
+      system_role:
         type: string
       username:
         type: string
     type: object
 info:
   contact: {}
-  description: Gələcək layihələr üçün mərkəzi User/Admin qeydiyyat modulu. Hər layihənin
-    ilk qeydiyyatdan keçən useri avtomatik admin olur, sonrakılar user. Öz JWT-sini
-    özü verir/yoxlayır.
-  title: Platform Identity Service API
-  version: "1.0"
+  description: 'Teslahubs-un mərkəzi identity modulu: istifadəçilər Shop-lara (many-to-many,
+    shop-admin/shop-user rolları ilə) üzv ola bilər və Product-lara (manual subscription)
+    abunə ola bilər. Sistem rolları: superadmin/admin/user.'
+  title: Teslahubs Identity Service API
+  version: "2.0"
 paths:
   /auth/login:
     post:
@@ -100,8 +181,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Layihənin ilk qeydiyyatdan keçən useri avtomatik 'admin' olur,
-        sonrakılar 'user'. role sahəsi qəbul edilmir — client özünü admin edə bilməz.
+      description: Always creates system role 'user' with no shop membership — shop_role
+        sahəsi qəbul edilmir.
       parameters:
       - description: Register payload
         in: body
@@ -122,22 +203,16 @@ paths:
             additionalProperties:
               type: string
             type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
         "409":
           description: Conflict
           schema:
             additionalProperties:
               type: string
             type: object
-      summary: Register a user under a project
+      summary: Register a Teslahubs account
       tags:
       - auth
-  /projects:
+  /products:
     get:
       produces:
       - application/json
@@ -146,43 +221,45 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.projectResponse'
+              $ref: '#/definitions/handlers.productResponse'
             type: array
-      summary: List all projects
+      summary: List all products
       tags:
-      - projects
+      - products
     post:
       consumes:
       - application/json
-      description: Açıq endpoint — sistem-səviyyəli superadmin anlayışı hələ yoxdur,
-        yeni layihə qurmaq istəyən istənilən kəs çağıra bilər.
+      description: Superadmin only.
       parameters:
-      - description: Project payload
+      - description: Product payload
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.createProjectRequest'
+          $ref: '#/definitions/handlers.createProductRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.projectResponse'
-        "400":
-          description: Bad Request
+            $ref: '#/definitions/handlers.productResponse'
+        "403":
+          description: Forbidden
           schema:
             additionalProperties:
               type: string
             type: object
-      summary: Register a new project
+      security:
+      - BearerAuth: []
+      summary: Create a product
       tags:
-      - projects
-  /projects/{id}:
+      - products
+  /products/{id}/access:
     get:
+      description: Returns "full" if subscribed, "demo" otherwise.
       parameters:
-      - description: Project ID
+      - description: Product ID
         in: path
         name: id
         required: true
@@ -193,20 +270,243 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.projectResponse'
+            $ref: '#/definitions/handlers.accessResponse'
         "404":
           description: Not Found
           schema:
             additionalProperties:
               type: string
             type: object
-      summary: Get a project by id
+      security:
+      - BearerAuth: []
+      summary: Check the caller's access level to a product
       tags:
-      - projects
+      - products
+  /shop-roles:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.shopRoleResponse'
+            type: array
+      summary: List all shop roles
+      tags:
+      - shop-roles
+  /shops:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.shopResponse'
+            type: array
+      summary: List all shops
+      tags:
+      - shops
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Shop payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createShopRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.shopResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register a new shop
+      tags:
+      - shops
+  /shops/{id}:
+    get:
+      parameters:
+      - description: Shop ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.shopResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get a shop by id
+      tags:
+      - shops
+  /shops/{id}/members:
+    get:
+      parameters:
+      - description: Shop ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.memberResponse'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List a shop's members
+      tags:
+      - shops
+    post:
+      consumes:
+      - application/json
+      description: Caller must be superadmin or that shop's own shop-admin.
+      parameters:
+      - description: Shop ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Member payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.addMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.memberResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Add an existing user to a shop
+      tags:
+      - shops
+  /shops/{id}/members/{userId}/role:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Shop ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Role payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.setMemberRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.memberResponse'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Change a member's shop role
+      tags:
+      - shops
+  /system-roles:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.systemRoleResponse'
+            type: array
+      summary: List all system roles
+      tags:
+      - system-roles
+  /users:
+    get:
+      description: Yalnız superadmin çağıra bilər.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.userResponse'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List every Teslahubs user
+      tags:
+      - users
   /users/{id}:
     get:
-      description: Özünü, ya da (admin rolunda olarsa) öz layihəsindəki istənilən
-        useri görə bilər.
+      description: Özünü, ya da (superadmin olarsa) istənilən useri görə bilər.
       parameters:
       - description: User ID
         in: path
@@ -237,23 +537,52 @@ paths:
       summary: Get a user
       tags:
       - users
-  /users/{id}/role:
-    post:
-      consumes:
-      - application/json
-      description: Yalnız caller öz layihəsinin admin-idirsə icazə verilir.
+  /users/{id}/shops:
+    get:
+      description: Özünü, ya da (superadmin olarsa) istənilən useri görə bilər.
       parameters:
       - description: User ID
         in: path
         name: id
         required: true
         type: string
-      - description: Role payload
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.memberResponse'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List the shops a user belongs to
+      tags:
+      - users
+  /users/{id}/status:
+    post:
+      consumes:
+      - application/json
+      description: Yalnız superadmin çağıra bilər.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Status payload
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.setRoleRequest'
+          $ref: '#/definitions/handlers.setStatusRequest'
       produces:
       - application/json
       responses:
@@ -267,17 +596,86 @@ paths:
             additionalProperties:
               type: string
             type: object
-        "404":
-          description: Not Found
+      security:
+      - BearerAuth: []
+      summary: Activate or deactivate a user
+      tags:
+      - users
+  /users/{id}/system-role:
+    post:
+      consumes:
+      - application/json
+      description: Yalnız superadmin çağıra bilər.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Role payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.setSystemRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.userResponse'
+        "403":
+          description: Forbidden
           schema:
             additionalProperties:
               type: string
             type: object
       security:
       - BearerAuth: []
-      summary: Change a user's role
+      summary: Change a user's system role
       tags:
       - users
+  /users/{userId}/products/{productId}/subscribe:
+    post:
+      consumes:
+      - application/json
+      description: Superadmin or admin only. No payment gateway integration.
+      parameters:
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Product ID
+        in: path
+        name: productId
+        required: true
+        type: string
+      - description: Subscription payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.setSubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.subscriptionResponse'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Manually set a user's subscription to a product
+      tags:
+      - products
 securityDefinitions:
   BearerAuth:
     in: header

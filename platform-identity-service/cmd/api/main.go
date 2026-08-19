@@ -19,12 +19,11 @@ import (
 	appmiddleware "platform-identity-service/internal/middleware"
 	"platform-identity-service/internal/repository"
 	"platform-identity-service/internal/service"
-	"platform-identity-service/internal/service/roleassign"
 )
 
-// @title           Platform Identity Service API
-// @version         1.0
-// @description     Gələcək layihələr üçün mərkəzi User/Admin qeydiyyat modulu. Hər layihənin ilk qeydiyyatdan keçən useri avtomatik admin olur, sonrakılar user. Öz JWT-sini özü verir/yoxlayır.
+// @title           Teslahubs Identity Service API
+// @version         2.0
+// @description     Teslahubs-un mərkəzi identity modulu: istifadəçilər Shop-lara (many-to-many, shop-admin/shop-user rolları ilə) üzv ola bilər və Product-lara (manual subscription) abunə ola bilər. Sistem rolları: superadmin/admin/user.
 // @BasePath        /api/v1
 // @securityDefinitions.apikey BearerAuth
 // @in header
@@ -53,20 +52,30 @@ func main() {
 		log.Fatalf("failed to seed superadmin: %v", err)
 	}
 
-	projectRepo := repository.NewProjectRepository(db)
 	userRepo := repository.NewUserRepository(db)
-	roleRepo := repository.NewRoleRepository(db)
+	shopRepo := repository.NewShopRepository(db)
+	membershipRepo := repository.NewShopMembershipRepository(db)
+	productRepo := repository.NewProductRepository(db)
+	subscriptionRepo := repository.NewSubscriptionRepository(db)
+	systemRoleRepo := repository.NewSystemRoleRepository(db)
+	shopRoleRepo := repository.NewShopRoleRepository(db)
 	jwtManager := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTTTLMinutes)
 
-	projectService := service.NewProjectService(projectRepo)
-	authService := service.NewAuthService(projectRepo, userRepo, jwtManager)
-	userService := service.NewUserService(userRepo, roleassign.NewSuperadminOrSameProjectAdmin())
-	roleService := service.NewRoleService(roleRepo)
+	authService := service.NewAuthService(userRepo, jwtManager)
+	userService := service.NewUserService(userRepo)
+	shopService := service.NewShopService(shopRepo)
+	membershipService := service.NewShopMembershipService(membershipRepo, userRepo, shopRepo)
+	productService := service.NewProductService(productRepo, subscriptionRepo)
+	systemRoleService := service.NewSystemRoleService(systemRoleRepo)
+	shopRoleService := service.NewShopRoleService(shopRoleRepo)
 
-	projectHandler := handlers.NewProjectHandler(projectService)
 	authHandler := handlers.NewAuthHandler(authService)
-	userHandler := handlers.NewUserHandler(userService)
-	roleHandler := handlers.NewRoleHandler(roleService)
+	userHandler := handlers.NewUserHandler(userService, membershipService)
+	shopHandler := handlers.NewShopHandler(shopService)
+	membershipHandler := handlers.NewShopMembershipHandler(membershipService)
+	productHandler := handlers.NewProductHandler(productService)
+	systemRoleHandler := handlers.NewSystemRoleHandler(systemRoleService)
+	shopRoleHandler := handlers.NewShopRoleHandler(shopRoleService)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -87,20 +96,32 @@ func main() {
 	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/projects", projectHandler.Create)
-		r.Get("/projects", projectHandler.List)
-		r.Get("/projects/{id}", projectHandler.Get)
-		r.Get("/roles", roleHandler.List)
+		r.Post("/shops", shopHandler.Create)
+		r.Get("/shops", shopHandler.List)
+		r.Get("/shops/{id}", shopHandler.Get)
+		r.Get("/system-roles", systemRoleHandler.List)
+		r.Get("/shop-roles", shopRoleHandler.List)
+		r.Get("/products", productHandler.List)
 
 		r.Post("/auth/register", authHandler.Register)
 		r.Post("/auth/login", authHandler.Login)
 
 		r.Group(func(r chi.Router) {
-			r.Use(appmiddleware.RequireAuth(jwtManager))
+			r.Use(appmiddleware.RequireAuth(jwtManager, userRepo))
+
 			r.Get("/users/{id}", userHandler.Get)
-			r.Post("/users/{id}/role", userHandler.SetRole)
-			r.Get("/projects/{id}/users", userHandler.ListByProject)
 			r.Get("/users", userHandler.ListAll)
+			r.Post("/users/{id}/system-role", userHandler.SetSystemRole)
+			r.Post("/users/{id}/status", userHandler.SetStatus)
+			r.Get("/users/{id}/shops", userHandler.ListMyShops)
+
+			r.Post("/shops/{id}/members", membershipHandler.AddMember)
+			r.Get("/shops/{id}/members", membershipHandler.ListMembers)
+			r.Post("/shops/{id}/members/{userId}/role", membershipHandler.SetMemberRole)
+
+			r.Post("/products", productHandler.Create)
+			r.Get("/products/{id}/access", productHandler.CheckAccess)
+			r.Post("/users/{userId}/products/{productId}/subscribe", productHandler.SetSubscription)
 		})
 	})
 
