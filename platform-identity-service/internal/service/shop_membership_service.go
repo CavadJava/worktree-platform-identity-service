@@ -16,6 +16,7 @@ var (
 	ErrMembershipNotFound = repository.ErrMembershipNotFound
 	ErrMembershipExists   = repository.ErrMembershipExists
 	ErrInvalidShopRole    = errors.New("invalid shop role: must be 'shop-admin' or 'shop-user'")
+	ErrCannotDemoteSelf   = errors.New("a shop-admin cannot change their own shop role")
 )
 
 var shopRoleNameToID = map[string]int16{
@@ -28,10 +29,11 @@ type ShopMembershipService struct {
 	userRepo       *repository.UserRepository
 	shopRepo       *repository.ShopRepository
 	authSvc        *AuthService
+	userSvc        *UserService
 }
 
-func NewShopMembershipService(membershipRepo *repository.ShopMembershipRepository, userRepo *repository.UserRepository, shopRepo *repository.ShopRepository, authSvc *AuthService) *ShopMembershipService {
-	return &ShopMembershipService{membershipRepo: membershipRepo, userRepo: userRepo, shopRepo: shopRepo, authSvc: authSvc}
+func NewShopMembershipService(membershipRepo *repository.ShopMembershipRepository, userRepo *repository.UserRepository, shopRepo *repository.ShopRepository, authSvc *AuthService, userSvc *UserService) *ShopMembershipService {
+	return &ShopMembershipService{membershipRepo: membershipRepo, userRepo: userRepo, shopRepo: shopRepo, authSvc: authSvc, userSvc: userSvc}
 }
 
 // callerMembership fetches caller's own membership row for shopID, or nil
@@ -147,6 +149,12 @@ func (s *ShopMembershipService) SetMemberRole(ctx context.Context, caller shopas
 	if err := s.authorize(ctx, caller, shopID); err != nil {
 		return nil, err
 	}
+	// A superadmin's UserID may be a synthetic placeholder, not a real
+	// user id — the self-check only makes sense for a real shop-admin
+	// caller, so skip it for superadmin the same way authorize() does.
+	if caller.SystemRole != models.SystemRoleSuperadmin && caller.UserID == targetUserID {
+		return nil, ErrCannotDemoteSelf
+	}
 
 	shopRoleID, ok := shopRoleNameToID[newShopRoleName]
 	if !ok {
@@ -157,6 +165,35 @@ func (s *ShopMembershipService) SetMemberRole(ctx context.Context, caller shopas
 		return nil, err
 	}
 	return s.membershipRepo.GetByUserAndShop(ctx, targetUserID, shopID)
+}
+
+// RemoveMember removes targetUserID's membership from shopID — the user's
+// Teslahubs account itself is untouched, they simply stop belonging to
+// this shop. Same authority as SetMemberRole (shop-admin of this shop, or
+// superadmin), with the same self-removal guard.
+func (s *ShopMembershipService) RemoveMember(ctx context.Context, caller shopassign.Caller, shopID, targetUserID string) error {
+	if err := s.authorize(ctx, caller, shopID); err != nil {
+		return err
+	}
+	if caller.SystemRole != models.SystemRoleSuperadmin && caller.UserID == targetUserID {
+		return ErrCannotDemoteSelf
+	}
+	return s.membershipRepo.Delete(ctx, targetUserID, shopID)
+}
+
+// UpdateMemberProfile lets a shop's own shop-admin (or superadmin) edit a
+// member's name/email/password. Uses the same authorization as
+// AddMember/SetMemberRole (shop-admin of THIS shop, or superadmin) —
+// targetUserID must actually be a member of shopID, otherwise this would
+// let a shop-admin edit an arbitrary user by guessing their id.
+func (s *ShopMembershipService) UpdateMemberProfile(ctx context.Context, caller shopassign.Caller, shopID, targetUserID string, in ProfileUpdate) (*models.User, error) {
+	if err := s.authorize(ctx, caller, shopID); err != nil {
+		return nil, err
+	}
+	if _, err := s.membershipRepo.GetByUserAndShop(ctx, targetUserID, shopID); err != nil {
+		return nil, err
+	}
+	return s.userSvc.applyProfileUpdate(ctx, targetUserID, in)
 }
 
 // ListMyShops returns every shop userID belongs to — no authorization

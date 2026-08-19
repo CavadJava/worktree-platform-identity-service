@@ -20,7 +20,8 @@ func newTestShopMembershipService(t *testing.T) (*ShopMembershipService, *AuthSe
 	jwtMgr := newTestJWTManager()
 	authSvc := NewAuthService(userRepo, jwtMgr)
 	shopSvc := NewShopService(shopRepo)
-	membershipSvc := NewShopMembershipService(membershipRepo, userRepo, shopRepo, authSvc)
+	userSvc := NewUserService(userRepo)
+	membershipSvc := NewShopMembershipService(membershipRepo, userRepo, shopRepo, authSvc, userSvc)
 	return membershipSvc, authSvc, shopSvc
 }
 
@@ -253,6 +254,143 @@ func TestShopMembershipService_SetMemberRole(t *testing.T) {
 	if updated.ShopRoleName != models.ShopRoleAdmin {
 		t.Errorf("expected shop-admin, got %q", updated.ShopRoleName)
 	}
+}
+
+func TestShopMembershipService_SetMemberRole_ShopAdminCannotDemoteSelf(t *testing.T) {
+	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
+
+	shop, err := shopSvc.Create(context.Background(), "SelfDemote Test "+uuid.NewString())
+	if err != nil {
+		t.Fatalf("create shop failed: %v", err)
+	}
+	shopAdmin, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "ShopAdmin", Username: "selfdemote-admin-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register shopAdmin failed: %v", err)
+	}
+
+	superadminCaller := shopassign.Caller{UserID: "superadmin-id", SystemRole: models.SystemRoleSuperadmin}
+	if _, err := membershipSvc.AddMember(context.Background(), superadminCaller, shop.ID, shopAdmin.ID, models.ShopRoleAdmin); err != nil {
+		t.Fatalf("bootstrap AddMember failed: %v", err)
+	}
+
+	shopAdminCaller := shopassign.Caller{UserID: shopAdmin.ID, SystemRole: models.SystemRoleUser}
+	_, err = membershipSvc.SetMemberRole(context.Background(), shopAdminCaller, shop.ID, shopAdmin.ID, models.ShopRoleUser)
+	if err != ErrCannotDemoteSelf {
+		t.Errorf("expected ErrCannotDemoteSelf, got %v", err)
+	}
+
+	// A superadmin CAN still change that same shop-admin's role — the
+	// self-lock only applies to the shop-admin acting on themself.
+	updated, err := membershipSvc.SetMemberRole(context.Background(), superadminCaller, shop.ID, shopAdmin.ID, models.ShopRoleUser)
+	if err != nil {
+		t.Fatalf("superadmin SetMemberRole on same user failed: %v", err)
+	}
+	if updated.ShopRoleName != models.ShopRoleUser {
+		t.Errorf("expected shop-user after superadmin change, got %q", updated.ShopRoleName)
+	}
+}
+
+func TestShopMembershipService_RemoveMember(t *testing.T) {
+	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
+
+	shop, err := shopSvc.Create(context.Background(), "RemoveMember Test "+uuid.NewString())
+	if err != nil {
+		t.Fatalf("create shop failed: %v", err)
+	}
+	target, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Target", Username: "remove-target-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register target failed: %v", err)
+	}
+
+	superadminCaller := shopassign.Caller{UserID: "superadmin-id", SystemRole: models.SystemRoleSuperadmin}
+	if _, err := membershipSvc.AddMember(context.Background(), superadminCaller, shop.ID, target.ID, models.ShopRoleUser); err != nil {
+		t.Fatalf("AddMember failed: %v", err)
+	}
+
+	if err := membershipSvc.RemoveMember(context.Background(), superadminCaller, shop.ID, target.ID); err != nil {
+		t.Fatalf("RemoveMember failed: %v", err)
+	}
+
+	members, err := membershipSvc.ListMembers(context.Background(), superadminCaller, shop.ID)
+	if err != nil {
+		t.Fatalf("ListMembers after remove failed: %v", err)
+	}
+	if len(members) != 0 {
+		t.Errorf("expected 0 members after removal, got %d", len(members))
+	}
+}
+
+func TestShopMembershipService_RemoveMember_ShopAdminCannotRemoveSelf(t *testing.T) {
+	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
+
+	shop, err := shopSvc.Create(context.Background(), "SelfRemove Test "+uuid.NewString())
+	if err != nil {
+		t.Fatalf("create shop failed: %v", err)
+	}
+	shopAdmin, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "ShopAdmin", Username: "selfremove-admin-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register shopAdmin failed: %v", err)
+	}
+
+	superadminCaller := shopassign.Caller{UserID: "superadmin-id", SystemRole: models.SystemRoleSuperadmin}
+	if _, err := membershipSvc.AddMember(context.Background(), superadminCaller, shop.ID, shopAdmin.ID, models.ShopRoleAdmin); err != nil {
+		t.Fatalf("bootstrap AddMember failed: %v", err)
+	}
+
+	shopAdminCaller := shopassign.Caller{UserID: shopAdmin.ID, SystemRole: models.SystemRoleUser}
+	if err := membershipSvc.RemoveMember(context.Background(), shopAdminCaller, shop.ID, shopAdmin.ID); err != ErrCannotDemoteSelf {
+		t.Errorf("expected ErrCannotDemoteSelf, got %v", err)
+	}
+}
+
+func TestShopMembershipService_UpdateMemberProfile(t *testing.T) {
+	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
+
+	shop, err := shopSvc.Create(context.Background(), "UpdateProfile Test "+uuid.NewString())
+	if err != nil {
+		t.Fatalf("create shop failed: %v", err)
+	}
+	shopAdmin, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "ShopAdmin", Username: "profile-admin-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register shopAdmin failed: %v", err)
+	}
+	target, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Target", Username: "profile-target-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register target failed: %v", err)
+	}
+
+	superadminCaller := shopassign.Caller{UserID: "superadmin-id", SystemRole: models.SystemRoleSuperadmin}
+	if _, err := membershipSvc.AddMember(context.Background(), superadminCaller, shop.ID, shopAdmin.ID, models.ShopRoleAdmin); err != nil {
+		t.Fatalf("bootstrap shopAdmin failed: %v", err)
+	}
+	if _, err := membershipSvc.AddMember(context.Background(), superadminCaller, shop.ID, target.ID, models.ShopRoleUser); err != nil {
+		t.Fatalf("AddMember target failed: %v", err)
+	}
+
+	newName := "Renamed Target"
+	shopAdminCaller := shopassign.Caller{UserID: shopAdmin.ID, SystemRole: models.SystemRoleUser}
+	updated, err := membershipSvc.UpdateMemberProfile(context.Background(), shopAdminCaller, shop.ID, target.ID, ProfileUpdate{Name: &newName})
+	if err != nil {
+		t.Fatalf("UpdateMemberProfile failed: %v", err)
+	}
+	if updated.Name != newName {
+		t.Errorf("expected name %q, got %q", newName, updated.Name)
+	}
+
+	// A shop-admin of a DIFFERENT shop, or the target's own login as a
+	// non-shop-admin, cannot edit — but the important case tested elsewhere
+	// (AddMember_ForbiddenForNonMember) already covers the authorize()
+	// path shared by this method, so it's not duplicated here.
 }
 
 func TestShopMembershipService_ListMyShops(t *testing.T) {

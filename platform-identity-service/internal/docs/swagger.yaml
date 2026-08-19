@@ -151,6 +151,24 @@ definitions:
       name:
         type: string
     type: object
+  handlers.updateMemberProfileRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+    type: object
+  handlers.updateProfileRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+    type: object
   handlers.userResponse:
     properties:
       email:
@@ -452,6 +470,78 @@ paths:
       summary: Add an existing user to a shop
       tags:
       - shops
+  /shops/{id}/members/{userId}:
+    delete:
+      description: Caller must be superadmin or that shop's own shop-admin. A shop-admin
+        cannot remove themself.
+      parameters:
+      - description: Shop ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Remove a member from a shop
+      tags:
+      - shops
+  /shops/{id}/members/{userId}/profile:
+    post:
+      consumes:
+      - application/json
+      description: Caller must be superadmin or that shop's own shop-admin. All fields
+        optional — omitted fields are left unchanged.
+      parameters:
+      - description: Shop ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Profile payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateMemberProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.userResponse'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Edit a shop member's name/email/password
+      tags:
+      - shops
   /shops/{id}/members/{userId}/role:
     post:
       consumes:
@@ -648,6 +738,42 @@ paths:
       security:
       - BearerAuth: []
       summary: Get a user
+      tags:
+      - users
+  /users/{id}/profile:
+    post:
+      consumes:
+      - application/json
+      description: Özünü, ya da (superadmin olarsa) istənilən useri redaktə edə bilər.
+        Bütün sahələr könüllüdür.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Profile payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.userResponse'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Edit a user's name/email/password
       tags:
       - users
   /users/{id}/shops:

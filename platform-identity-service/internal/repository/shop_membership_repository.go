@@ -99,6 +99,22 @@ func (r *ShopMembershipRepository) ListByUser(ctx context.Context, userID string
 	return memberships, rows.Err()
 }
 
+func (r *ShopMembershipRepository) Delete(ctx context.Context, userID, shopID string) error {
+	const q = `DELETE FROM user_shop_memberships WHERE user_id = $1 AND shop_id = $2`
+	result, err := r.db.ExecContext(ctx, q, userID, shopID)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrMembershipNotFound
+	}
+	return nil
+}
+
 func (r *ShopMembershipRepository) SetShopRole(ctx context.Context, userID, shopID string, shopRoleID int16) error {
 	const q = `UPDATE user_shop_memberships SET shop_role_id = $3 WHERE user_id = $1 AND shop_id = $2`
 	result, err := r.db.ExecContext(ctx, q, userID, shopID, shopRoleID)

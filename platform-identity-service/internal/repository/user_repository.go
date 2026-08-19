@@ -109,6 +109,38 @@ func (r *UserRepository) SetSystemRole(ctx context.Context, userID string, syste
 	return nil
 }
 
+// UserUpdate carries the optional fields Update may change — a nil field
+// leaves that column untouched, so callers only pass what they're
+// actually changing (name/email/password can each be edited independently).
+type UserUpdate struct {
+	Name         *string
+	Email        *string
+	PasswordHash *string
+}
+
+func (r *UserRepository) Update(ctx context.Context, userID string, u UserUpdate) error {
+	const q = `
+		UPDATE users SET
+			name = COALESCE($2, name),
+			email = COALESCE($3, email),
+			password_hash = COALESCE($4, password_hash),
+			updated_at = now()
+		WHERE id = $1
+	`
+	_, err := r.db.ExecContext(ctx, q, userID, u.Name, u.Email, u.PasswordHash)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			if pgErr.ConstraintName == "users_username_key" {
+				return ErrUsernameTaken
+			}
+			return ErrEmailTaken
+		}
+		return err
+	}
+	return nil
+}
+
 func (r *UserRepository) SetStatus(ctx context.Context, userID, status string) error {
 	const q = `UPDATE users SET status = $2, updated_at = now() WHERE id = $1`
 	result, err := r.db.ExecContext(ctx, q, userID, status)

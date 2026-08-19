@@ -155,3 +155,69 @@ func TestUserService_SetStatus_SuperadminOnly(t *testing.T) {
 		t.Errorf("expected IN_ACTIVE, got %q", updated.Status)
 	}
 }
+
+func TestUserService_UpdateProfile_Self(t *testing.T) {
+	userSvc, authSvc := newTestUserService(t)
+
+	u, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Original Name", Username: "profile-self-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register failed: %v", err)
+	}
+
+	caller := shopassign.Caller{UserID: u.ID, SystemRole: models.SystemRoleUser}
+	newName := "New Name"
+	updated, err := userSvc.UpdateProfile(context.Background(), caller, u.ID, ProfileUpdate{Name: &newName})
+	if err != nil {
+		t.Fatalf("UpdateProfile failed: %v", err)
+	}
+	if updated.Name != newName {
+		t.Errorf("expected name %q, got %q", newName, updated.Name)
+	}
+}
+
+func TestUserService_UpdateProfile_ForbiddenForOtherPlainUser(t *testing.T) {
+	userSvc, authSvc := newTestUserService(t)
+
+	caller, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Caller", Username: "profile-caller-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register caller failed: %v", err)
+	}
+	target, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Target", Username: "profile-forbidden-target-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register target failed: %v", err)
+	}
+
+	callerClaims := shopassign.Caller{UserID: caller.ID, SystemRole: models.SystemRoleUser}
+	newName := "Hijacked"
+	_, err = userSvc.UpdateProfile(context.Background(), callerClaims, target.ID, ProfileUpdate{Name: &newName})
+	if err != ErrForbidden {
+		t.Errorf("expected ErrForbidden, got %v", err)
+	}
+}
+
+func TestUserService_UpdateProfile_SuperadminCanEditAnyone(t *testing.T) {
+	userSvc, authSvc := newTestUserService(t)
+
+	target, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Target", Username: "profile-superadmin-target-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register target failed: %v", err)
+	}
+
+	superadminCaller := shopassign.Caller{UserID: "superadmin-id", SystemRole: models.SystemRoleSuperadmin}
+	newEmail := uuid.NewString() + "@example.com"
+	updated, err := userSvc.UpdateProfile(context.Background(), superadminCaller, target.ID, ProfileUpdate{Email: &newEmail})
+	if err != nil {
+		t.Fatalf("UpdateProfile by superadmin failed: %v", err)
+	}
+	if updated.Email != newEmail {
+		t.Errorf("expected email %q, got %q", newEmail, updated.Email)
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"platform-identity-service/internal/auth"
 	"platform-identity-service/internal/models"
 	"platform-identity-service/internal/repository"
 	"platform-identity-service/internal/service/shopassign"
@@ -69,6 +70,47 @@ func (s *UserService) SetStatus(ctx context.Context, caller shopassign.Caller, t
 		return nil, ErrInvalidStatus
 	}
 	if err := s.repo.SetStatus(ctx, targetUserID, newStatus); err != nil {
+		return nil, err
+	}
+	return s.repo.GetByID(ctx, targetUserID)
+}
+
+// ProfileUpdate mirrors repository.UserUpdate at the service boundary —
+// nil fields are left unchanged, and Password (plaintext, if provided) is
+// hashed here before ever reaching the repository.
+type ProfileUpdate struct {
+	Name     *string
+	Email    *string
+	Password *string
+}
+
+// UpdateProfile lets a user edit their own name/email/password, or lets a
+// superadmin edit anyone's. Editing a shop-mate's profile as a shop-admin
+// goes through ShopMembershipService.UpdateMemberProfile instead, since
+// that authorization decision needs the shop-membership lookup this
+// service doesn't have.
+func (s *UserService) UpdateProfile(ctx context.Context, caller shopassign.Caller, targetUserID string, in ProfileUpdate) (*models.User, error) {
+	if caller.UserID != targetUserID && caller.SystemRole != models.SystemRoleSuperadmin {
+		return nil, ErrForbidden
+	}
+	return s.applyProfileUpdate(ctx, targetUserID, in)
+}
+
+// applyProfileUpdate does the actual hash-and-write, shared by
+// UserService.UpdateProfile and ShopMembershipService.UpdateMemberProfile
+// (which perform their own, different authorization checks before calling
+// this — UserService exports it as a package-level helper via this method
+// rather than duplicating the hashing logic).
+func (s *UserService) applyProfileUpdate(ctx context.Context, targetUserID string, in ProfileUpdate) (*models.User, error) {
+	update := repository.UserUpdate{Name: in.Name, Email: in.Email}
+	if in.Password != nil {
+		hash, err := auth.HashPassword(*in.Password)
+		if err != nil {
+			return nil, err
+		}
+		update.PasswordHash = &hash
+	}
+	if err := s.repo.Update(ctx, targetUserID, update); err != nil {
 		return nil, err
 	}
 	return s.repo.GetByID(ctx, targetUserID)

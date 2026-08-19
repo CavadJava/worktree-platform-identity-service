@@ -51,7 +51,7 @@ func testRouter(t *testing.T) (chi.Router, *sql.DB) {
 	authSvc := service.NewAuthService(userRepo, jwtManager)
 	userSvc := service.NewUserService(userRepo)
 	shopSvc := service.NewShopService(shopRepo)
-	membershipSvc := service.NewShopMembershipService(membershipRepo, userRepo, shopRepo, authSvc)
+	membershipSvc := service.NewShopMembershipService(membershipRepo, userRepo, shopRepo, authSvc, userSvc)
 
 	authHandler := NewAuthHandler(authSvc)
 	userHandler := NewUserHandler(userSvc, membershipSvc)

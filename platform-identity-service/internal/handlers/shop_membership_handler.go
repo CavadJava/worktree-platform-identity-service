@@ -206,10 +206,92 @@ func (h *ShopMembershipHandler) SetMemberRole(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusOK, toMemberResponse(m))
 }
 
+// RemoveMember godoc
+// @Summary      Remove a member from a shop
+// @Description  Caller must be superadmin or that shop's own shop-admin. A shop-admin cannot remove themself.
+// @Tags         shops
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Shop ID"
+// @Param        userId path string true "User ID"
+// @Success      204
+// @Failure      403 {object} map[string]string
+// @Router       /shops/{id}/members/{userId} [delete]
+func (h *ShopMembershipHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	shopID := chi.URLParam(r, "id")
+	userID := chi.URLParam(r, "userId")
+	if err := h.svc.RemoveMember(r.Context(), caller, shopID, userID); err != nil {
+		writeMembershipError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type updateMemberProfileRequest struct {
+	Name     *string `json:"name"`
+	Email    *string `json:"email"`
+	Password *string `json:"password"`
+}
+
+// UpdateMemberProfile godoc
+// @Summary      Edit a shop member's name/email/password
+// @Description  Caller must be superadmin or that shop's own shop-admin. All fields optional — omitted fields are left unchanged.
+// @Tags         shops
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Shop ID"
+// @Param        userId path string true "User ID"
+// @Param        request body updateMemberProfileRequest true "Profile payload"
+// @Success      200 {object} userResponse
+// @Failure      403 {object} map[string]string
+// @Router       /shops/{id}/members/{userId}/profile [post]
+func (h *ShopMembershipHandler) UpdateMemberProfile(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req updateMemberProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	shopID := chi.URLParam(r, "id")
+	userID := chi.URLParam(r, "userId")
+	u, err := h.svc.UpdateMemberProfile(r.Context(), caller, shopID, userID, service.ProfileUpdate{
+		Name: req.Name, Email: req.Email, Password: req.Password,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrUsernameTaken):
+			writeError(w, http.StatusConflict, "username already registered")
+		case errors.Is(err, service.ErrEmailTaken):
+			writeError(w, http.StatusConflict, "email already registered")
+		default:
+			writeMembershipError(w, err)
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, userResponse{
+		ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email, SystemRole: u.SystemRoleName, Status: u.Status,
+	})
+}
+
 func writeMembershipError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrForbidden):
 		writeError(w, http.StatusForbidden, "superadmin or this shop's own shop-admin required")
+	case errors.Is(err, service.ErrCannotDemoteSelf):
+		writeError(w, http.StatusForbidden, "a shop-admin cannot change or remove their own membership")
 	case errors.Is(err, service.ErrInvalidShopRole):
 		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, service.ErrMembershipExists):

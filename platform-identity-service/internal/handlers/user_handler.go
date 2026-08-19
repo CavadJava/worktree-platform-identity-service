@@ -150,6 +150,57 @@ func (h *UserHandler) SetStatus(w http.ResponseWriter, r *http.Request) {
 	writeUserOrError(w, u, err)
 }
 
+type updateProfileRequest struct {
+	Name     *string `json:"name"`
+	Email    *string `json:"email"`
+	Password *string `json:"password"`
+}
+
+// UpdateProfile godoc
+// @Summary      Edit a user's name/email/password
+// @Description  Özünü, ya da (superadmin olarsa) istənilən useri redaktə edə bilər. Bütün sahələr könüllüdür.
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "User ID"
+// @Param        request body updateProfileRequest true "Profile payload"
+// @Success      200 {object} userResponse
+// @Failure      403 {object} map[string]string
+// @Router       /users/{id}/profile [post]
+func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req updateProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	u, err := h.svc.UpdateProfile(r.Context(), caller, id, service.ProfileUpdate{
+		Name: req.Name, Email: req.Email, Password: req.Password,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrUsernameTaken):
+			writeError(w, http.StatusConflict, "username already registered")
+		case errors.Is(err, service.ErrEmailTaken):
+			writeError(w, http.StatusConflict, "email already registered")
+		default:
+			writeUserOrError(w, nil, err)
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, userResponse{
+		ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email, SystemRole: u.SystemRoleName, Status: u.Status,
+	})
+}
+
 // ListMyShops godoc
 // @Summary      List the shops a user belongs to
 // @Description  Özünü, ya da (superadmin olarsa) istənilən useri görə bilər.
