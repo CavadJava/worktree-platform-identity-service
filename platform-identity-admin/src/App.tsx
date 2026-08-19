@@ -4,8 +4,9 @@ import { AuthProvider } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
 import { AppLayout } from './layouts/AppLayout';
 import { LoginPage } from './pages/LoginPage';
-import { ProjectsPage } from './pages/ProjectsPage';
-import { RolesPage } from './pages/RolesPage';
+import { ShopsPage } from './pages/ShopsPage';
+import { ShopMembersPage } from './pages/ShopMembersPage';
+import { ProductsPage } from './pages/ProductsPage';
 import { UsersPage } from './pages/UsersPage';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false } } });
@@ -19,13 +20,14 @@ export function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route element={<RequireAuth />}>
               <Route element={<AppLayout />}>
-                <Route index element={<Navigate to="/projects" replace />} />
-                <Route path="/projects" element={<ProjectsPage />} />
-                <Route path="/roles" element={<RolesPage />} />
+                <Route index element={<Navigate to="/shops" replace />} />
+                <Route path="/shops" element={<ShopsPage />} />
+                <Route path="/shops/:id/members" element={<ShopMembersPage />} />
+                <Route path="/products" element={<ProductsPage />} />
                 <Route path="/users" element={<UsersPage />} />
               </Route>
             </Route>
-            <Route path="*" element={<Navigate to="/projects" replace />} />
+            <Route path="*" element={<Navigate to="/shops" replace />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>
