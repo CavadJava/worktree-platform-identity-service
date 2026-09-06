@@ -30,7 +30,6 @@ func testDB(t *testing.T) *sql.DB {
 	if _, err := db.Exec(`SET search_path TO test_repository`); err != nil {
 		t.Fatalf("set search_path: %v", err)
 	}
-	os.Setenv("ALLOW_DESTRUCTIVE_MIGRATE", "true")
 	if err := database.Migrate(db); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}

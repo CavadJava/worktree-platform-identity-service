@@ -38,7 +38,6 @@ func testRouter(t *testing.T) (chi.Router, *sql.DB) {
 	if _, err := db.Exec(`SET search_path TO test_handlers`); err != nil {
 		t.Fatalf("set search_path: %v", err)
 	}
-	os.Setenv("ALLOW_DESTRUCTIVE_MIGRATE", "true")
 	if err := database.Migrate(db); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}

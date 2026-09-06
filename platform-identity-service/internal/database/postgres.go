@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -32,59 +31,34 @@ func Connect(cfg *config.Config) (*sql.DB, error) {
 	return db, nil
 }
 
+// Migrate is idempotent and additive — safe to run on every startup
+// against a database that already has real data. It never drops a table;
+// every statement is CREATE TABLE IF NOT EXISTS / ADD COLUMN IF NOT EXISTS
+// / INSERT ... ON CONFLICT DO NOTHING, so re-running it is always a no-op
+// on anything that already exists.
 func Migrate(db *sql.DB) error {
-	var usersTableExists bool
-	if err := db.QueryRow(`
-		SELECT EXISTS (
-			SELECT FROM information_schema.tables
-			WHERE table_name = 'users' AND table_schema = current_schema()
-		)
-	`).Scan(&usersTableExists); err != nil {
-		return fmt.Errorf("check existing users table: %w", err)
-	}
-
-	if usersTableExists {
-		var userCount int
-		if err := db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&userCount); err != nil {
-			return fmt.Errorf("count existing users: %w", err)
-		}
-		if userCount > 0 && os.Getenv("ALLOW_DESTRUCTIVE_MIGRATE") != "true" {
-			return fmt.Errorf("refusing to run destructive migration against a database with existing user data — set ALLOW_DESTRUCTIVE_MIGRATE=true to override")
-		}
-	}
-
 	_, err := db.Exec(`
-		DROP TABLE IF EXISTS user_product_subscriptions;
-		DROP TABLE IF EXISTS products;
-		DROP TABLE IF EXISTS user_shop_memberships;
-		DROP TABLE IF EXISTS users;
-		DROP TABLE IF EXISTS shops;
-		DROP TABLE IF EXISTS shop_roles;
-		DROP TABLE IF EXISTS system_roles;
-		DROP TABLE IF EXISTS roles;
-		DROP TABLE IF EXISTS projects;
-
-		CREATE TABLE system_roles (
+		CREATE TABLE IF NOT EXISTS system_roles (
 			id SMALLSERIAL PRIMARY KEY,
 			name TEXT UNIQUE NOT NULL
 		);
 		INSERT INTO system_roles (id, name) VALUES (1, 'superadmin'), (2, 'admin'), (3, 'user')
 		ON CONFLICT (id) DO NOTHING;
 
-		CREATE TABLE shop_roles (
+		CREATE TABLE IF NOT EXISTS shop_roles (
 			id SMALLSERIAL PRIMARY KEY,
 			name TEXT UNIQUE NOT NULL
 		);
 		INSERT INTO shop_roles (id, name) VALUES (1, 'shop-admin'), (2, 'shop-user')
 		ON CONFLICT (id) DO NOTHING;
 
-		CREATE TABLE shops (
+		CREATE TABLE IF NOT EXISTS shops (
 			id UUID PRIMARY KEY,
 			name TEXT NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
 
-		CREATE TABLE users (
+		CREATE TABLE IF NOT EXISTS users (
 			id UUID PRIMARY KEY,
 			name TEXT NOT NULL,
 			username TEXT NOT NULL UNIQUE,
@@ -96,7 +70,7 @@ func Migrate(db *sql.DB) error {
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
 
-		CREATE TABLE user_shop_memberships (
+		CREATE TABLE IF NOT EXISTS user_shop_memberships (
 			id UUID PRIMARY KEY,
 			user_id UUID NOT NULL REFERENCES users(id),
 			shop_id UUID NOT NULL REFERENCES shops(id),
@@ -104,16 +78,16 @@ func Migrate(db *sql.DB) error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			UNIQUE (user_id, shop_id)
 		);
-		CREATE INDEX idx_memberships_shop_id ON user_shop_memberships (shop_id);
-		CREATE INDEX idx_memberships_user_id ON user_shop_memberships (user_id);
+		CREATE INDEX IF NOT EXISTS idx_memberships_shop_id ON user_shop_memberships (shop_id);
+		CREATE INDEX IF NOT EXISTS idx_memberships_user_id ON user_shop_memberships (user_id);
 
-		CREATE TABLE products (
+		CREATE TABLE IF NOT EXISTS products (
 			id UUID PRIMARY KEY,
 			name TEXT NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
 
-		CREATE TABLE user_product_subscriptions (
+		CREATE TABLE IF NOT EXISTS user_product_subscriptions (
 			id UUID PRIMARY KEY,
 			user_id UUID NOT NULL REFERENCES users(id),
 			product_id UUID NOT NULL REFERENCES products(id),
