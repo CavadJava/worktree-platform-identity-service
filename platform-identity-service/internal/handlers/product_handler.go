@@ -135,8 +135,9 @@ func (h *ProductHandler) CheckAccess(w http.ResponseWriter, r *http.Request) {
 }
 
 type setSubscriptionRequest struct {
-	Subscripted bool `json:"subscripted"`
-	Renewed     bool `json:"renewed"`
+	Subscripted bool   `json:"subscripted"`
+	Renewed     bool   `json:"renewed"`
+	Notes       string `json:"notes"`
 }
 
 type subscriptionResponse struct {
@@ -144,6 +145,7 @@ type subscriptionResponse struct {
 	ProductID   string `json:"product_id"`
 	Subscripted bool   `json:"subscripted"`
 	Renewed     bool   `json:"renewed"`
+	Notes       string `json:"notes"`
 }
 
 // SetSubscription godoc
@@ -174,7 +176,7 @@ func (h *ProductHandler) SetSubscription(w http.ResponseWriter, r *http.Request)
 
 	targetUserID := chi.URLParam(r, "userId")
 	productID := chi.URLParam(r, "productId")
-	sub, err := h.svc.SetSubscription(r.Context(), caller, targetUserID, productID, req.Subscripted, req.Renewed)
+	sub, err := h.svc.SetSubscription(r.Context(), caller, targetUserID, productID, req.Subscripted, req.Renewed, req.Notes)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrForbidden):
@@ -187,7 +189,7 @@ func (h *ProductHandler) SetSubscription(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, http.StatusOK, subscriptionResponse{
-		UserID: sub.UserID, ProductID: sub.ProductID, Subscripted: sub.Subscripted, Renewed: sub.Renewed,
+		UserID: sub.UserID, ProductID: sub.ProductID, Subscripted: sub.Subscripted, Renewed: sub.Renewed, Notes: sub.Notes,
 	})
 }
 
@@ -413,6 +415,6 @@ func (h *ProductHandler) CreateUserAndSubscribe(w http.ResponseWriter, r *http.R
 		return
 	}
 	writeJSON(w, http.StatusCreated, subscriptionResponse{
-		UserID: sub.UserID, ProductID: sub.ProductID, Subscripted: sub.Subscripted, Renewed: sub.Renewed,
+		UserID: sub.UserID, ProductID: sub.ProductID, Subscripted: sub.Subscripted, Renewed: sub.Renewed, Notes: sub.Notes,
 	})
 }

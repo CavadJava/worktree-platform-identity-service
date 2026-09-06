@@ -418,6 +418,7 @@ func TestSubscriptionRepository_UpsertAndGet(t *testing.T) {
 	}
 
 	sub.Subscripted = true
+	sub.Notes = "called customer, will renew next month"
 	sub.UpdatedAt = time.Now().UTC()
 	if err := subRepo.Upsert(context.Background(), sub); err != nil {
 		t.Fatalf("update upsert failed: %v", err)
@@ -429,6 +430,9 @@ func TestSubscriptionRepository_UpsertAndGet(t *testing.T) {
 	}
 	if !got.Subscripted {
 		t.Error("expected Subscripted=true after upsert update")
+	}
+	if got.Notes != "called customer, will renew next month" {
+		t.Errorf("expected notes to round-trip, got %q", got.Notes)
 	}
 
 	_, err = subRepo.GetByUserAndProduct(context.Background(), u.ID, uuid.NewString())

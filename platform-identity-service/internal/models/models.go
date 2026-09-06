@@ -82,6 +82,7 @@ type Subscription struct {
 	ProductID   string
 	Subscripted bool
 	Renewed     bool
+	Notes       string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

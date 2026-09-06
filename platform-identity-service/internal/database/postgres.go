@@ -108,6 +108,7 @@ func Migrate(db *sql.DB) error {
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			UNIQUE (user_id, product_id)
 		);
+		ALTER TABLE user_product_subscriptions ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';
 	`)
 	if err != nil {
 		return fmt.Errorf("migrate: %w", err)

@@ -113,7 +113,7 @@ func (s *ProductService) CheckAccess(ctx context.Context, userID, productID stri
 // SetSubscription is called by an admin/superadmin to manually toggle a
 // user's subscription — there is no payment gateway integration in this
 // scope.
-func (s *ProductService) SetSubscription(ctx context.Context, caller shopassign.Caller, targetUserID, productID string, subscripted, renewed bool) (*models.Subscription, error) {
+func (s *ProductService) SetSubscription(ctx context.Context, caller shopassign.Caller, targetUserID, productID string, subscripted, renewed bool, notes string) (*models.Subscription, error) {
 	if caller.SystemRole != models.SystemRoleSuperadmin {
 		return nil, ErrForbidden
 	}
@@ -134,7 +134,7 @@ func (s *ProductService) SetSubscription(ctx context.Context, caller shopassign.
 
 	sub := &models.Subscription{
 		ID: id, UserID: targetUserID, ProductID: productID,
-		Subscripted: subscripted, Renewed: renewed,
+		Subscripted: subscripted, Renewed: renewed, Notes: notes,
 		CreatedAt: createdAt, UpdatedAt: now,
 	}
 	if err := s.subRepo.Upsert(ctx, sub); err != nil {
