@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -323,6 +324,69 @@ func TestProductRepository_CreateListGet(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected created product in List result")
+	}
+}
+
+func TestProductRepository_UpdateProfile(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	repo := NewProductRepository(db)
+
+	p := &models.Product{ID: uuid.NewString(), Name: "Teslahubs " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	if err := repo.Create(context.Background(), p); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	if err := repo.Update(context.Background(), p.ID, "A Tesla platform", "React, Go, Postgres"); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	got, err := repo.GetByID(context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Description != "A Tesla platform" || got.TechStack != "React, Go, Postgres" {
+		t.Fatalf("expected profile to be updated, got description=%q tech_stack=%q", got.Description, got.TechStack)
+	}
+}
+
+func TestSubprojectRepository_CreateListDelete(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	productRepo := NewProductRepository(db)
+	subRepo := NewSubprojectRepository(db)
+
+	p := &models.Product{ID: uuid.NewString(), Name: "Teslahubs " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	if err := productRepo.Create(context.Background(), p); err != nil {
+		t.Fatalf("create product: %v", err)
+	}
+
+	sub := &models.ProductSubproject{ID: uuid.NewString(), ProductID: p.ID, Name: "auth-service", Description: "handles login", CreatedAt: time.Now().UTC()}
+	if err := subRepo.Create(context.Background(), sub); err != nil {
+		t.Fatalf("create subproject: %v", err)
+	}
+
+	list, err := subRepo.ListByProduct(context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(list) != 1 || list[0].Name != "auth-service" {
+		t.Fatalf("expected one subproject named auth-service, got %+v", list)
+	}
+
+	if err := subRepo.Delete(context.Background(), sub.ID); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	list, err = subRepo.ListByProduct(context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("list after delete: %v", err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("expected zero subprojects after delete, got %d", len(list))
+	}
+
+	if err := subRepo.Delete(context.Background(), uuid.NewString()); !errors.Is(err, ErrSubprojectNotFound) {
+		t.Fatalf("expected ErrSubprojectNotFound for unknown id, got %v", err)
 	}
 }
 
