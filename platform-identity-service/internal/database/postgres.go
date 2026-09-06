@@ -86,6 +86,17 @@ func Migrate(db *sql.DB) error {
 			name TEXT NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
+		ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '';
+		ALTER TABLE products ADD COLUMN IF NOT EXISTS tech_stack TEXT NOT NULL DEFAULT '';
+
+		CREATE TABLE IF NOT EXISTS product_subprojects (
+			id UUID PRIMARY KEY,
+			product_id UUID NOT NULL REFERENCES products(id),
+			name TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		);
+		CREATE INDEX IF NOT EXISTS idx_subprojects_product_id ON product_subprojects (product_id);
 
 		CREATE TABLE IF NOT EXISTS user_product_subscriptions (
 			id UUID PRIMARY KEY,
