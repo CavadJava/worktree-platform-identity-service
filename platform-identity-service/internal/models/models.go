@@ -61,9 +61,19 @@ type ShopMembership struct {
 }
 
 type Product struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	TechStack   string    `json:"tech_stack"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type ProductSubproject struct {
+	ID          string    `json:"id"`
+	ProductID   string    `json:"product_id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type Subscription struct {
