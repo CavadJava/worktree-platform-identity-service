@@ -5,6 +5,7 @@ import type { Product, Subproject } from '../api/types';
 import {
   addSubproject,
   createProduct,
+  createProductUser,
   listProducts,
   listSubprojects,
   removeSubproject,
@@ -23,6 +24,13 @@ interface SubprojectFormValues {
   description: string;
 }
 
+interface ProductUserFormValues {
+  name: string;
+  username: string;
+  email: string;
+  password: string;
+}
+
 export function ProductsPage() {
   const queryClient = useQueryClient();
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -31,9 +39,11 @@ export function ProductsPage() {
   const [subscripted, setSubscripted] = useState(false);
   const [renewed, setRenewed] = useState(false);
   const [profileModalProduct, setProfileModalProduct] = useState<Product | null>(null);
+  const [userModalProduct, setUserModalProduct] = useState<Product | null>(null);
   const [form] = Form.useForm<ProductFormValues>();
   const [profileForm] = Form.useForm<{ description: string; techStack: string }>();
   const [subprojectForm] = Form.useForm<SubprojectFormValues>();
+  const [productUserForm] = Form.useForm<ProductUserFormValues>();
 
   const { data: products, isLoading, isError, error } = useQuery({ queryKey: ['products'], queryFn: () => listProducts() });
   useQueryErrorToast(isError, error);
@@ -97,6 +107,17 @@ export function ProductsPage() {
     onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
   });
 
+  const createProductUserMutation = useMutation({
+    mutationFn: (values: ProductUserFormValues) =>
+      createProductUser(userModalProduct!.id, values.name, values.username, values.email, values.password),
+    onSuccess: () => {
+      message.success('İstifadəçi yaradıldı və məhsula abunə edildi');
+      setUserModalProduct(null);
+      productUserForm.resetFields();
+    },
+    onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
+  });
+
   const openProfileModal = (product: Product) => {
     setProfileModalProduct(product);
     profileForm.setFieldsValue({ description: product.description, techStack: product.tech_stack });
@@ -114,6 +135,9 @@ export function ProductsPage() {
           </Button>
           <Button size="small" onClick={() => setSubModalProduct(record)}>
             Subscription idarə et
+          </Button>
+          <Button size="small" onClick={() => setUserModalProduct(record)}>
+            Yeni istifadəçi
           </Button>
         </Space>
       ),
@@ -242,6 +266,32 @@ export function ProductsPage() {
             </Form.Item>
           </Form>
         </div>
+      </Modal>
+      <Modal
+        title={userModalProduct ? `${userModalProduct.name} — Yeni istifadəçi` : ''}
+        open={!!userModalProduct}
+        onCancel={() => setUserModalProduct(null)}
+        onOk={() => productUserForm.submit()}
+        confirmLoading={createProductUserMutation.isPending}
+      >
+        <Form
+          form={productUserForm}
+          layout="vertical"
+          onFinish={(values) => createProductUserMutation.mutate(values)}
+        >
+          <Form.Item name="name" label="Ad" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="username" label="İstifadəçi adı" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="password" label="Parol" rules={[{ required: true, min: 6 }]}>
+            <Input.Password />
+          </Form.Item>
+        </Form>
       </Modal>
     </>
   );

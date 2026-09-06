@@ -57,3 +57,19 @@ export async function addSubproject(productId: string, name: string, description
 export async function removeSubproject(productId: string, subId: string): Promise<void> {
   await platformIdentityApi.delete(`/products/${productId}/subprojects/${subId}`);
 }
+
+export async function createProductUser(
+  productId: string,
+  name: string,
+  username: string,
+  email: string,
+  password: string
+): Promise<{ user_id: string; product_id: string; subscripted: boolean; renewed: boolean }> {
+  const response = await platformIdentityApi.post(`/products/${productId}/users`, {
+    name,
+    username,
+    email,
+    password,
+  });
+  return response.data;
+}
