@@ -22,10 +22,11 @@ const (
 type ProductService struct {
 	productRepo *repository.ProductRepository
 	subRepo     *repository.SubscriptionRepository
+	subprojRepo *repository.SubprojectRepository
 }
 
-func NewProductService(productRepo *repository.ProductRepository, subRepo *repository.SubscriptionRepository) *ProductService {
-	return &ProductService{productRepo: productRepo, subRepo: subRepo}
+func NewProductService(productRepo *repository.ProductRepository, subRepo *repository.SubscriptionRepository, subprojRepo *repository.SubprojectRepository) *ProductService {
+	return &ProductService{productRepo: productRepo, subRepo: subRepo, subprojRepo: subprojRepo}
 }
 
 func (s *ProductService) Create(ctx context.Context, name string) (*models.Product, error) {
@@ -38,6 +39,52 @@ func (s *ProductService) Create(ctx context.Context, name string) (*models.Produ
 
 func (s *ProductService) List(ctx context.Context) ([]models.Product, error) {
 	return s.productRepo.List(ctx)
+}
+
+// UpdateProfile lets a superadmin set a product's description and tech
+// stack. Both fields are always submitted together by the admin panel form.
+func (s *ProductService) UpdateProfile(ctx context.Context, caller shopassign.Caller, productID, description, techStack string) (*models.Product, error) {
+	if caller.SystemRole != models.SystemRoleSuperadmin {
+		return nil, ErrForbidden
+	}
+	if err := s.productRepo.Update(ctx, productID, description, techStack); err != nil {
+		return nil, err
+	}
+	return s.productRepo.GetByID(ctx, productID)
+}
+
+// AddSubproject lets a superadmin record a named internal module of a
+// product (e.g. Teslahubs -> auth-service). Manually entered, no external
+// discovery.
+func (s *ProductService) AddSubproject(ctx context.Context, caller shopassign.Caller, productID, name, description string) (*models.ProductSubproject, error) {
+	if caller.SystemRole != models.SystemRoleSuperadmin {
+		return nil, ErrForbidden
+	}
+	if _, err := s.productRepo.GetByID(ctx, productID); err != nil {
+		return nil, err
+	}
+	sub := &models.ProductSubproject{
+		ID: uuid.NewString(), ProductID: productID, Name: name, Description: description,
+		CreatedAt: time.Now().UTC(),
+	}
+	if err := s.subprojRepo.Create(ctx, sub); err != nil {
+		return nil, err
+	}
+	return sub, nil
+}
+
+// ListSubprojects has no caller-role check, matching List's existing
+// no-auth read pattern — subprojects are visible to anyone who can see the
+// product.
+func (s *ProductService) ListSubprojects(ctx context.Context, productID string) ([]models.ProductSubproject, error) {
+	return s.subprojRepo.ListByProduct(ctx, productID)
+}
+
+func (s *ProductService) RemoveSubproject(ctx context.Context, caller shopassign.Caller, subprojectID string) error {
+	if caller.SystemRole != models.SystemRoleSuperadmin {
+		return ErrForbidden
+	}
+	return s.subprojRepo.Delete(ctx, subprojectID)
 }
 
 // CheckAccess reports "full" if userID has an active subscription to
