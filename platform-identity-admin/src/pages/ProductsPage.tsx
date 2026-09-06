@@ -38,6 +38,7 @@ export function ProductsPage() {
   const [subUserId, setSubUserId] = useState<string | null>(null);
   const [subscripted, setSubscripted] = useState(false);
   const [renewed, setRenewed] = useState(false);
+  const [subNotes, setSubNotes] = useState('');
   const [profileModalProduct, setProfileModalProduct] = useState<Product | null>(null);
   const [userModalProduct, setUserModalProduct] = useState<Product | null>(null);
   const [form] = Form.useForm<ProductFormValues>();
@@ -68,13 +69,14 @@ export function ProductsPage() {
   });
 
   const subMutation = useMutation({
-    mutationFn: () => setSubscription(subUserId!, subModalProduct!.id, subscripted, renewed),
+    mutationFn: () => setSubscription(subUserId!, subModalProduct!.id, subscripted, renewed, subNotes),
     onSuccess: () => {
       message.success('Subscription yeniləndi');
       setSubModalProduct(null);
       setSubUserId(null);
       setSubscripted(false);
       setRenewed(false);
+      setSubNotes('');
     },
     onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
   });
@@ -187,6 +189,12 @@ export function ProductsPage() {
             <span>Renewed:</span>
             <Switch checked={renewed} onChange={setRenewed} />
           </Space>
+          <Input.TextArea
+            rows={3}
+            placeholder="Müştəri haqqında qeyd"
+            value={subNotes}
+            onChange={(e) => setSubNotes(e.target.value)}
+          />
         </Space>
       </Modal>
       <Modal

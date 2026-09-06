@@ -35,6 +35,14 @@ export interface Subproject {
   created_at: string;
 }
 
+export interface Subscription {
+  user_id: string;
+  product_id: string;
+  subscripted: boolean;
+  renewed: boolean;
+  notes: string;
+}
+
 export interface Member {
   id: string;
   user_id: string;

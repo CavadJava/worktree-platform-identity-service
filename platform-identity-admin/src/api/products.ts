@@ -1,5 +1,5 @@
 import { platformIdentityApi } from './httpClients';
-import type { Product, Subproject } from './types';
+import type { Product, Subproject, Subscription } from './types';
 
 export async function listProducts(): Promise<Product[]> {
   const response = await platformIdentityApi.get<Product[]>('/products');
@@ -20,11 +20,13 @@ export async function setSubscription(
   userId: string,
   productId: string,
   subscripted: boolean,
-  renewed: boolean
-): Promise<{ user_id: string; product_id: string; subscripted: boolean; renewed: boolean }> {
-  const response = await platformIdentityApi.post(`/users/${userId}/products/${productId}/subscribe`, {
+  renewed: boolean,
+  notes: string
+): Promise<Subscription> {
+  const response = await platformIdentityApi.post<Subscription>(`/users/${userId}/products/${productId}/subscribe`, {
     subscripted,
     renewed,
+    notes,
   });
   return response.data;
 }
