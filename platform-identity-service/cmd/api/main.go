@@ -57,6 +57,7 @@ func main() {
 	membershipRepo := repository.NewShopMembershipRepository(db)
 	productRepo := repository.NewProductRepository(db)
 	subscriptionRepo := repository.NewSubscriptionRepository(db)
+	subprojectRepo := repository.NewSubprojectRepository(db)
 	systemRoleRepo := repository.NewSystemRoleRepository(db)
 	shopRoleRepo := repository.NewShopRoleRepository(db)
 	jwtManager := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTTTLMinutes)
@@ -65,7 +66,7 @@ func main() {
 	userService := service.NewUserService(userRepo)
 	shopService := service.NewShopService(shopRepo)
 	membershipService := service.NewShopMembershipService(membershipRepo, userRepo, shopRepo, authService, userService)
-	productService := service.NewProductService(productRepo, subscriptionRepo)
+	productService := service.NewProductService(productRepo, subscriptionRepo, subprojectRepo)
 	systemRoleService := service.NewSystemRoleService(systemRoleRepo)
 	shopRoleService := service.NewShopRoleService(shopRoleRepo)
 
@@ -102,6 +103,7 @@ func main() {
 		r.Get("/system-roles", systemRoleHandler.List)
 		r.Get("/shop-roles", shopRoleHandler.List)
 		r.Get("/products", productHandler.List)
+		r.Get("/products/{id}/subprojects", productHandler.ListSubprojects)
 
 		r.Post("/auth/register", authHandler.Register)
 		r.Post("/auth/login", authHandler.Login)
@@ -127,6 +129,9 @@ func main() {
 			r.Post("/products", productHandler.Create)
 			r.Get("/products/{id}/access", productHandler.CheckAccess)
 			r.Post("/users/{userId}/products/{productId}/subscribe", productHandler.SetSubscription)
+			r.Post("/products/{id}/profile", productHandler.UpdateProfile)
+			r.Post("/products/{id}/subprojects", productHandler.AddSubproject)
+			r.Delete("/products/{id}/subprojects/{subId}", productHandler.RemoveSubproject)
 		})
 	})
 
