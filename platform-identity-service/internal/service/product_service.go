@@ -23,10 +23,11 @@ type ProductService struct {
 	productRepo *repository.ProductRepository
 	subRepo     *repository.SubscriptionRepository
 	subprojRepo *repository.SubprojectRepository
+	authSvc     *AuthService
 }
 
-func NewProductService(productRepo *repository.ProductRepository, subRepo *repository.SubscriptionRepository, subprojRepo *repository.SubprojectRepository) *ProductService {
-	return &ProductService{productRepo: productRepo, subRepo: subRepo, subprojRepo: subprojRepo}
+func NewProductService(productRepo *repository.ProductRepository, subRepo *repository.SubscriptionRepository, subprojRepo *repository.SubprojectRepository, authSvc *AuthService) *ProductService {
+	return &ProductService{productRepo: productRepo, subRepo: subRepo, subprojRepo: subprojRepo, authSvc: authSvc}
 }
 
 func (s *ProductService) Create(ctx context.Context, name string) (*models.Product, error) {
@@ -135,6 +136,37 @@ func (s *ProductService) SetSubscription(ctx context.Context, caller shopassign.
 		ID: id, UserID: targetUserID, ProductID: productID,
 		Subscripted: subscripted, Renewed: renewed,
 		CreatedAt: createdAt, UpdatedAt: now,
+	}
+	if err := s.subRepo.Upsert(ctx, sub); err != nil {
+		return nil, err
+	}
+	return sub, nil
+}
+
+// CreateUserAndSubscribe creates a brand-new Teslahubs account (system role
+// 'user', same as self-service Register) and immediately subscribes it to
+// productID — a superadmin onboarding someone straight into a product from
+// the admin panel, without a separate "create user, then find them in a
+// list, then subscribe them" round trip.
+func (s *ProductService) CreateUserAndSubscribe(ctx context.Context, caller shopassign.Caller, productID string, in CreateUserInput) (*models.Subscription, error) {
+	if caller.SystemRole != models.SystemRoleSuperadmin {
+		return nil, ErrForbidden
+	}
+	if _, err := s.productRepo.GetByID(ctx, productID); err != nil {
+		return nil, err
+	}
+
+	in.SystemRole = models.SystemRoleUser
+	u, err := s.authSvc.CreateUser(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	sub := &models.Subscription{
+		ID: uuid.NewString(), UserID: u.ID, ProductID: productID,
+		Subscripted: true, Renewed: false,
+		CreatedAt: now, UpdatedAt: now,
 	}
 	if err := s.subRepo.Upsert(ctx, sub); err != nil {
 		return nil, err

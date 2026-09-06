@@ -355,3 +355,64 @@ func (h *ProductHandler) RemoveSubproject(w http.ResponseWriter, r *http.Request
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+type createProductUserRequest struct {
+	Name     string `json:"name"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// CreateUserAndSubscribe godoc
+// @Summary      Create a brand-new user and subscribe it to a product
+// @Description  Superadmin only. Creates a system-role 'user' account and
+// @Description  immediately marks it subscribed to the product.
+// @Tags         products
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Product ID"
+// @Param        request body createProductUserRequest true "New user payload"
+// @Success      201 {object} subscriptionResponse
+// @Failure      403 {object} map[string]string
+// @Router       /products/{id}/users [post]
+func (h *ProductHandler) CreateUserAndSubscribe(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req createProductUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Name == "" || req.Username == "" || req.Email == "" || req.Password == "" {
+		writeError(w, http.StatusBadRequest, "name, username, email and password are required")
+		return
+	}
+
+	productID := chi.URLParam(r, "id")
+	sub, err := h.svc.CreateUserAndSubscribe(r.Context(), caller, productID, service.CreateUserInput{
+		Name: req.Name, Username: req.Username, Email: req.Email, Password: req.Password,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			writeError(w, http.StatusForbidden, "superadmin role required")
+		case errors.Is(err, repository.ErrProductNotFound):
+			writeError(w, http.StatusNotFound, "product not found")
+		case errors.Is(err, service.ErrUsernameTaken):
+			writeError(w, http.StatusConflict, "username already registered")
+		case errors.Is(err, service.ErrEmailTaken):
+			writeError(w, http.StatusConflict, "email already registered")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to create user")
+		}
+		return
+	}
+	writeJSON(w, http.StatusCreated, subscriptionResponse{
+		UserID: sub.UserID, ProductID: sub.ProductID, Subscripted: sub.Subscripted, Renewed: sub.Renewed,
+	})
+}

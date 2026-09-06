@@ -46,7 +46,8 @@ func testProductRouter(t *testing.T) (chi.Router, *sql.DB, *auth.JWTManager) {
 	subprojRepo := repository.NewSubprojectRepository(db)
 	jwtManager := auth.NewJWTManager("product-handler-test-secret", 60)
 
-	productService := service.NewProductService(productRepo, subRepo, subprojRepo)
+	authService := service.NewAuthService(userRepo, jwtManager)
+	productService := service.NewProductService(productRepo, subRepo, subprojRepo, authService)
 	productHandler := NewProductHandler(productService)
 
 	r := chi.NewRouter()
@@ -55,6 +56,7 @@ func testProductRouter(t *testing.T) (chi.Router, *sql.DB, *auth.JWTManager) {
 	r.Group(func(r chi.Router) {
 		r.Use(appmiddleware.RequireAuth(jwtManager, userRepo))
 		r.Post("/api/v1/products", productHandler.Create)
+		r.Post("/api/v1/products/{id}/users", productHandler.CreateUserAndSubscribe)
 		r.Post("/api/v1/products/{id}/profile", productHandler.UpdateProfile)
 		r.Post("/api/v1/products/{id}/subprojects", productHandler.AddSubproject)
 		r.Delete("/api/v1/products/{id}/subprojects/{subId}", productHandler.RemoveSubproject)
@@ -79,6 +81,35 @@ func createTestSuperadmin(t *testing.T, db *sql.DB, jwtManager *auth.JWTManager)
 		t.Fatalf("generate token: %v", err)
 	}
 	return token
+}
+
+func TestProductHandler_CreateUserAndSubscribe(t *testing.T) {
+	r, db, jwtManager := testProductRouter(t)
+	token := createTestSuperadmin(t, db, jwtManager)
+
+	rec := doJSON(t, r, http.MethodPost, "/api/v1/products", token, map[string]string{"name": "ESound"})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create product: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var createdEnv struct {
+		Data productResponse `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&createdEnv)
+	product := createdEnv.Data
+
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/products/"+product.ID+"/users", token, map[string]string{
+		"name": "Product User", "username": "produser-" + product.ID, "email": "produser-" + product.ID + "@example.com", "password": "password123",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create user and subscribe: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var subEnv struct {
+		Data subscriptionResponse `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&subEnv)
+	if subEnv.Data.ProductID != product.ID || !subEnv.Data.Subscripted {
+		t.Fatalf("expected subscribed subscription for product, got %+v", subEnv.Data)
+	}
 }
 
 func TestProductHandler_ProfileAndSubprojects(t *testing.T) {

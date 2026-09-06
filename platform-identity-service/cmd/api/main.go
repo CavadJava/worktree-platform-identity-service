@@ -66,7 +66,7 @@ func main() {
 	userService := service.NewUserService(userRepo)
 	shopService := service.NewShopService(shopRepo)
 	membershipService := service.NewShopMembershipService(membershipRepo, userRepo, shopRepo, authService, userService)
-	productService := service.NewProductService(productRepo, subscriptionRepo, subprojectRepo)
+	productService := service.NewProductService(productRepo, subscriptionRepo, subprojectRepo, authService)
 	systemRoleService := service.NewSystemRoleService(systemRoleRepo)
 	shopRoleService := service.NewShopRoleService(shopRoleRepo)
 
@@ -132,6 +132,7 @@ func main() {
 			r.Post("/products/{id}/profile", productHandler.UpdateProfile)
 			r.Post("/products/{id}/subprojects", productHandler.AddSubproject)
 			r.Delete("/products/{id}/subprojects/{subId}", productHandler.RemoveSubproject)
+			r.Post("/products/{id}/users", productHandler.CreateUserAndSubscribe)
 		})
 	})
 

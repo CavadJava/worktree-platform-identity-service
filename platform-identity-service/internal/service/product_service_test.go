@@ -13,10 +13,12 @@ import (
 func newTestProductService(t *testing.T) *ProductService {
 	t.Helper()
 	db := testDB(t)
+	userRepo := repository.NewUserRepository(db)
 	productRepo := repository.NewProductRepository(db)
 	subRepo := repository.NewSubscriptionRepository(db)
 	subprojRepo := repository.NewSubprojectRepository(db)
-	return NewProductService(productRepo, subRepo, subprojRepo)
+	authSvc := NewAuthService(userRepo, newTestJWTManager())
+	return NewProductService(productRepo, subRepo, subprojRepo, authSvc)
 }
 
 func TestProductService_UpdateProfile_RequiresSuperadmin(t *testing.T) {
@@ -37,6 +39,38 @@ func TestProductService_UpdateProfile_RequiresSuperadmin(t *testing.T) {
 	}
 	if updated.Description != "A Tesla platform" || updated.TechStack != "React, Go, Postgres" {
 		t.Fatalf("expected updated profile, got %+v", updated)
+	}
+}
+
+func TestProductService_CreateUserAndSubscribe(t *testing.T) {
+	svc := newTestProductService(t)
+	p, err := svc.Create(context.Background(), "Teslahubs")
+	if err != nil {
+		t.Fatalf("create product: %v", err)
+	}
+	superadmin := shopassign.Caller{SystemRole: models.SystemRoleSuperadmin}
+	nonAdmin := shopassign.Caller{SystemRole: models.SystemRoleUser}
+
+	in := CreateUserInput{Name: "New User", Username: "newuser-" + p.ID, Email: "newuser-" + p.ID + "@example.com", Password: "password123"}
+
+	if _, err := svc.CreateUserAndSubscribe(context.Background(), nonAdmin, p.ID, in); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden for non-superadmin, got %v", err)
+	}
+
+	sub, err := svc.CreateUserAndSubscribe(context.Background(), superadmin, p.ID, in)
+	if err != nil {
+		t.Fatalf("create user and subscribe: %v", err)
+	}
+	if !sub.Subscripted {
+		t.Fatalf("expected new user to be subscripted, got %+v", sub)
+	}
+
+	access, err := svc.CheckAccess(context.Background(), sub.UserID, p.ID)
+	if err != nil {
+		t.Fatalf("check access: %v", err)
+	}
+	if access != AccessFull {
+		t.Fatalf("expected full access after subscribe, got %q", access)
 	}
 }
 
