@@ -1,13 +1,26 @@
 import { useState } from 'react';
-import { Button, Form, Input, Modal, Select, Space, Switch, Table, message } from 'antd';
+import { Button, Form, Input, List, Modal, Select, Space, Switch, Table, Tag, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Product } from '../api/types';
-import { createProduct, listProducts, setSubscription } from '../api/products';
+import type { Product, Subproject } from '../api/types';
+import {
+  addSubproject,
+  createProduct,
+  listProducts,
+  listSubprojects,
+  removeSubproject,
+  setSubscription,
+  updateProductProfile,
+} from '../api/products';
 import { listAllUsers } from '../api/users';
 import { useQueryErrorToast } from '../hooks/useQueryErrorToast';
 
 interface ProductFormValues {
   name: string;
+}
+
+interface SubprojectFormValues {
+  name: string;
+  description: string;
 }
 
 export function ProductsPage() {
@@ -17,12 +30,21 @@ export function ProductsPage() {
   const [subUserId, setSubUserId] = useState<string | null>(null);
   const [subscripted, setSubscripted] = useState(false);
   const [renewed, setRenewed] = useState(false);
+  const [profileModalProduct, setProfileModalProduct] = useState<Product | null>(null);
   const [form] = Form.useForm<ProductFormValues>();
+  const [profileForm] = Form.useForm<{ description: string; techStack: string }>();
+  const [subprojectForm] = Form.useForm<SubprojectFormValues>();
 
   const { data: products, isLoading, isError, error } = useQuery({ queryKey: ['products'], queryFn: () => listProducts() });
   useQueryErrorToast(isError, error);
 
   const { data: allUsers } = useQuery({ queryKey: ['all-users-for-sub'], queryFn: () => listAllUsers(), enabled: !!subModalProduct });
+
+  const { data: subprojects } = useQuery({
+    queryKey: ['product-subprojects', profileModalProduct?.id],
+    queryFn: () => listSubprojects(profileModalProduct!.id),
+    enabled: !!profileModalProduct,
+  });
 
   const createMutation = useMutation({
     mutationFn: (values: ProductFormValues) => createProduct(values.name),
@@ -47,15 +69,53 @@ export function ProductsPage() {
     onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
   });
 
+  const profileMutation = useMutation({
+    mutationFn: (values: { description: string; techStack: string }) =>
+      updateProductProfile(profileModalProduct!.id, values.description, values.techStack),
+    onSuccess: () => {
+      message.success('Profil yeniləndi');
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+    onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
+  });
+
+  const addSubprojectMutation = useMutation({
+    mutationFn: (values: SubprojectFormValues) =>
+      addSubproject(profileModalProduct!.id, values.name, values.description),
+    onSuccess: () => {
+      subprojectForm.resetFields();
+      queryClient.invalidateQueries({ queryKey: ['product-subprojects', profileModalProduct?.id] });
+    },
+    onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
+  });
+
+  const removeSubprojectMutation = useMutation({
+    mutationFn: (subId: string) => removeSubproject(profileModalProduct!.id, subId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['product-subprojects', profileModalProduct?.id] });
+    },
+    onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
+  });
+
+  const openProfileModal = (product: Product) => {
+    setProfileModalProduct(product);
+    profileForm.setFieldsValue({ description: product.description, techStack: product.tech_stack });
+  };
+
   const columns = [
     { title: 'Ad', dataIndex: 'name' },
     { title: 'ID', dataIndex: 'id' },
     {
       title: 'Əməliyyat',
       render: (_: unknown, record: Product) => (
-        <Button size="small" onClick={() => setSubModalProduct(record)}>
-          Subscription idarə et
-        </Button>
+        <Space>
+          <Button size="small" onClick={() => openProfileModal(record)}>
+            Profil
+          </Button>
+          <Button size="small" onClick={() => setSubModalProduct(record)}>
+            Subscription idarə et
+          </Button>
+        </Space>
       ),
     },
   ];
@@ -104,6 +164,84 @@ export function ProductsPage() {
             <Switch checked={renewed} onChange={setRenewed} />
           </Space>
         </Space>
+      </Modal>
+      <Modal
+        title={profileModalProduct ? `${profileModalProduct.name} — Profil` : ''}
+        open={!!profileModalProduct}
+        onCancel={() => setProfileModalProduct(null)}
+        footer={null}
+        width={640}
+      >
+        <Form
+          form={profileForm}
+          layout="vertical"
+          onFinish={(values) => profileMutation.mutate(values)}
+        >
+          <Form.Item name="description" label="Təsvir">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+          <Form.Item name="techStack" label="Tech stack (vergüllə ayrılmış, məs. React, Go, Postgres)">
+            <Input />
+          </Form.Item>
+          <Form.Item shouldUpdate>
+            {() => {
+              const raw = profileForm.getFieldValue('techStack') as string | undefined;
+              const tags = (raw ?? '').split(',').map((t) => t.trim()).filter(Boolean);
+              return (
+                <Space wrap>
+                  {tags.map((tag) => (
+                    <Tag key={tag}>{tag}</Tag>
+                  ))}
+                </Space>
+              );
+            }}
+          </Form.Item>
+          <Button type="primary" htmlType="submit" loading={profileMutation.isPending}>
+            Profili yadda saxla
+          </Button>
+        </Form>
+
+        <div style={{ marginTop: 24 }}>
+          <h4>Daxili layihələr</h4>
+          <List
+            size="small"
+            dataSource={subprojects ?? []}
+            renderItem={(sub: Subproject) => (
+              <List.Item
+                actions={[
+                  <Button
+                    key="remove"
+                    size="small"
+                    danger
+                    onClick={() => removeSubprojectMutation.mutate(sub.id)}
+                  >
+                    Sil
+                  </Button>,
+                ]}
+              >
+                <List.Item.Meta title={sub.name} description={sub.description} />
+              </List.Item>
+            )}
+          />
+          <Form
+            form={subprojectForm}
+            layout="inline"
+            style={{ marginTop: 12 }}
+            onFinish={(values) => addSubprojectMutation.mutate(values)}
+          >
+            <Form.Item name="name" rules={[{ required: true, message: 'Ad tələb olunur' }]}>
+              <Input placeholder="Ad (məs. auth-service)" />
+            </Form.Item>
+            <Form.Item name="description">
+              <Input placeholder="Təsvir" />
+            </Form.Item>
+            <Form.Item>
+              <Button htmlType="submit" loading={addSubprojectMutation.isPending}>
+                Əlavə et
+              </Button>
+            </Form.Item>
+          </Form>
+        </div>
       </Modal>
     </>
   );
