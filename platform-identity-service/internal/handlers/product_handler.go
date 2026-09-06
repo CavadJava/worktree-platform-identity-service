@@ -26,9 +26,18 @@ type createProductRequest struct {
 }
 
 type productResponse struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"created_at"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	TechStack   string `json:"tech_stack"`
+	CreatedAt   string `json:"created_at"`
+}
+
+func toProductResponse(p *models.Product) productResponse {
+	return productResponse{
+		ID: p.ID, Name: p.Name, Description: p.Description, TechStack: p.TechStack,
+		CreatedAt: p.CreatedAt.Format(timeFormat),
+	}
 }
 
 // Create godoc
@@ -68,7 +77,7 @@ func (h *ProductHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to create product")
 		return
 	}
-	writeJSON(w, http.StatusCreated, productResponse{ID: p.ID, Name: p.Name, CreatedAt: p.CreatedAt.Format(timeFormat)})
+	writeJSON(w, http.StatusCreated, toProductResponse(p))
 }
 
 // List godoc
@@ -86,7 +95,7 @@ func (h *ProductHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	response := make([]productResponse, len(products))
 	for i, p := range products {
-		response[i] = productResponse{ID: p.ID, Name: p.Name, CreatedAt: p.CreatedAt.Format(timeFormat)}
+		response[i] = toProductResponse(&p)
 	}
 	writeJSON(w, http.StatusOK, response)
 }
@@ -180,4 +189,169 @@ func (h *ProductHandler) SetSubscription(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, subscriptionResponse{
 		UserID: sub.UserID, ProductID: sub.ProductID, Subscripted: sub.Subscripted, Renewed: sub.Renewed,
 	})
+}
+
+type updateProductProfileRequest struct {
+	Description string `json:"description"`
+	TechStack   string `json:"tech_stack"`
+}
+
+// UpdateProfile godoc
+// @Summary      Set a product's description and tech stack
+// @Description  Superadmin only.
+// @Tags         products
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Product ID"
+// @Param        request body updateProductProfileRequest true "Profile payload"
+// @Success      200 {object} productResponse
+// @Failure      403 {object} map[string]string
+// @Router       /products/{id}/profile [post]
+func (h *ProductHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req updateProductProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	productID := chi.URLParam(r, "id")
+	p, err := h.svc.UpdateProfile(r.Context(), caller, productID, req.Description, req.TechStack)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			writeError(w, http.StatusForbidden, "superadmin role required")
+		case errors.Is(err, repository.ErrProductNotFound):
+			writeError(w, http.StatusNotFound, "product not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to update profile")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, toProductResponse(p))
+}
+
+type addSubprojectRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+type subprojectResponse struct {
+	ID          string `json:"id"`
+	ProductID   string `json:"product_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	CreatedAt   string `json:"created_at"`
+}
+
+// AddSubproject godoc
+// @Summary      Add a named subproject/module to a product
+// @Description  Superadmin only.
+// @Tags         products
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Product ID"
+// @Param        request body addSubprojectRequest true "Subproject payload"
+// @Success      201 {object} subprojectResponse
+// @Failure      403 {object} map[string]string
+// @Router       /products/{id}/subprojects [post]
+func (h *ProductHandler) AddSubproject(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req addSubprojectRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+
+	productID := chi.URLParam(r, "id")
+	sub, err := h.svc.AddSubproject(r.Context(), caller, productID, req.Name, req.Description)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			writeError(w, http.StatusForbidden, "superadmin role required")
+		case errors.Is(err, repository.ErrProductNotFound):
+			writeError(w, http.StatusNotFound, "product not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to add subproject")
+		}
+		return
+	}
+	writeJSON(w, http.StatusCreated, subprojectResponse{
+		ID: sub.ID, ProductID: sub.ProductID, Name: sub.Name, Description: sub.Description,
+		CreatedAt: sub.CreatedAt.Format(timeFormat),
+	})
+}
+
+// ListSubprojects godoc
+// @Summary      List a product's subprojects
+// @Tags         products
+// @Produce      json
+// @Param        id path string true "Product ID"
+// @Success      200 {array} subprojectResponse
+// @Router       /products/{id}/subprojects [get]
+func (h *ProductHandler) ListSubprojects(w http.ResponseWriter, r *http.Request) {
+	productID := chi.URLParam(r, "id")
+	subprojects, err := h.svc.ListSubprojects(r.Context(), productID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list subprojects")
+		return
+	}
+
+	response := make([]subprojectResponse, len(subprojects))
+	for i, s := range subprojects {
+		response[i] = subprojectResponse{
+			ID: s.ID, ProductID: s.ProductID, Name: s.Name, Description: s.Description,
+			CreatedAt: s.CreatedAt.Format(timeFormat),
+		}
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+// RemoveSubproject godoc
+// @Summary      Remove a subproject
+// @Description  Superadmin only.
+// @Tags         products
+// @Security     BearerAuth
+// @Param        id path string true "Product ID"
+// @Param        subId path string true "Subproject ID"
+// @Success      204
+// @Failure      403 {object} map[string]string
+// @Router       /products/{id}/subprojects/{subId} [delete]
+func (h *ProductHandler) RemoveSubproject(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	subID := chi.URLParam(r, "subId")
+	err := h.svc.RemoveSubproject(r.Context(), caller, subID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			writeError(w, http.StatusForbidden, "superadmin role required")
+		case errors.Is(err, repository.ErrSubprojectNotFound):
+			writeError(w, http.StatusNotFound, "subproject not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to remove subproject")
+		}
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
