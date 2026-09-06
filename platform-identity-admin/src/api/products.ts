@@ -1,5 +1,5 @@
 import { platformIdentityApi } from './httpClients';
-import type { Product } from './types';
+import type { Product, Subproject } from './types';
 
 export async function listProducts(): Promise<Product[]> {
   const response = await platformIdentityApi.get<Product[]>('/products');
@@ -27,4 +27,33 @@ export async function setSubscription(
     renewed,
   });
   return response.data;
+}
+
+export async function updateProductProfile(
+  productId: string,
+  description: string,
+  techStack: string
+): Promise<Product> {
+  const response = await platformIdentityApi.post<Product>(`/products/${productId}/profile`, {
+    description,
+    tech_stack: techStack,
+  });
+  return response.data;
+}
+
+export async function listSubprojects(productId: string): Promise<Subproject[]> {
+  const response = await platformIdentityApi.get<Subproject[]>(`/products/${productId}/subprojects`);
+  return response.data;
+}
+
+export async function addSubproject(productId: string, name: string, description: string): Promise<Subproject> {
+  const response = await platformIdentityApi.post<Subproject>(`/products/${productId}/subprojects`, {
+    name,
+    description,
+  });
+  return response.data;
+}
+
+export async function removeSubproject(productId: string, subId: string): Promise<void> {
+  await platformIdentityApi.delete(`/products/${productId}/subprojects/${subId}`);
 }

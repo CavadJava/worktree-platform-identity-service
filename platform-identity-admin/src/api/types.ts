@@ -22,6 +22,16 @@ export interface ShopRole {
 export interface Product {
   id: string;
   name: string;
+  description: string;
+  tech_stack: string;
+  created_at: string;
+}
+
+export interface Subproject {
+  id: string;
+  product_id: string;
+  name: string;
+  description: string;
   created_at: string;
 }
 
