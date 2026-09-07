@@ -27,6 +27,19 @@ func (r *SubprojectRepository) Create(ctx context.Context, s *models.ProductSubp
 	return err
 }
 
+func (r *SubprojectRepository) GetByID(ctx context.Context, id string) (*models.ProductSubproject, error) {
+	const q = `SELECT id, product_id, name, description, created_at FROM product_subprojects WHERE id = $1`
+	var s models.ProductSubproject
+	err := r.db.QueryRowContext(ctx, q, id).Scan(&s.ID, &s.ProductID, &s.Name, &s.Description, &s.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrSubprojectNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
 func (r *SubprojectRepository) ListByProduct(ctx context.Context, productID string) ([]models.ProductSubproject, error) {
 	const q = `
 		SELECT id, product_id, name, description, created_at

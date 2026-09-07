@@ -115,3 +115,60 @@ func TestProductService_SubprojectLifecycle(t *testing.T) {
 		t.Fatalf("expected zero subprojects after remove, got %d", len(list))
 	}
 }
+
+func TestProductService_AdminWithSubscriptionCanManageTheirProduct(t *testing.T) {
+	svc := newTestProductService(t)
+	p, err := svc.Create(context.Background(), "Teslahubs")
+	if err != nil {
+		t.Fatalf("create product: %v", err)
+	}
+	superadmin := shopassign.Caller{SystemRole: models.SystemRoleSuperadmin}
+
+	// Create an admin user
+	adminUser, err := svc.authSvc.CreateUser(context.Background(), CreateUserInput{
+		Name:       "Admin User",
+		Username:   "admin-" + p.ID,
+		Email:      "admin-" + p.ID + "@example.com",
+		Password:   "password123",
+		SystemRole: models.SystemRoleAdmin,
+	})
+	if err != nil {
+		t.Fatalf("create admin user: %v", err)
+	}
+	admin := shopassign.Caller{UserID: adminUser.ID, SystemRole: models.SystemRoleAdmin}
+
+	// Admin has no subscription yet — must be forbidden.
+	if _, err := svc.UpdateProfile(context.Background(), admin, p.ID, "desc", "Go"); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden before subscription exists, got %v", err)
+	}
+
+	// Superadmin subscribes the admin to the product.
+	if _, err := svc.SetSubscription(context.Background(), superadmin, admin.UserID, p.ID, true, false, ""); err != nil {
+		t.Fatalf("subscribe admin: %v", err)
+	}
+
+	// Now the admin can manage it.
+	updated, err := svc.UpdateProfile(context.Background(), admin, p.ID, "A Tesla platform", "Go, React")
+	if err != nil {
+		t.Fatalf("expected admin with subscription to manage product, got %v", err)
+	}
+	if updated.Description != "A Tesla platform" {
+		t.Fatalf("expected profile updated, got %+v", updated)
+	}
+
+	// A different admin, still unsubscribed, is still forbidden.
+	otherAdminUser, err := svc.authSvc.CreateUser(context.Background(), CreateUserInput{
+		Name:       "Other Admin",
+		Username:   "other-admin-" + p.ID,
+		Email:      "other-admin-" + p.ID + "@example.com",
+		Password:   "password123",
+		SystemRole: models.SystemRoleAdmin,
+	})
+	if err != nil {
+		t.Fatalf("create other admin user: %v", err)
+	}
+	otherAdmin := shopassign.Caller{UserID: otherAdminUser.ID, SystemRole: models.SystemRoleAdmin}
+	if _, err := svc.UpdateProfile(context.Background(), otherAdmin, p.ID, "x", "y"); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden for unsubscribed admin, got %v", err)
+	}
+}
