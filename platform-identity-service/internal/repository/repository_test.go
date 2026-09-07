@@ -440,3 +440,73 @@ func TestSubscriptionRepository_UpsertAndGet(t *testing.T) {
 		t.Errorf("expected ErrSubscriptionNotFound, got %v", err)
 	}
 }
+
+func TestProductAdminRequestRepository_CreateListDecide(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	userRepo := NewUserRepository(db)
+	productRepo := NewProductRepository(db)
+	reqRepo := NewProductAdminRequestRepository(db)
+
+	p := &models.Product{ID: uuid.NewString(), Name: "Req Product " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	if err := productRepo.Create(context.Background(), p); err != nil {
+		t.Fatalf("create product: %v", err)
+	}
+	subject := createTestUser(t, userRepo, 3)
+	requester := createTestUser(t, userRepo, 2)
+
+	hasPending, err := reqRepo.HasPending(context.Background(), p.ID, subject.ID)
+	if err != nil {
+		t.Fatalf("has pending (before): %v", err)
+	}
+	if hasPending {
+		t.Fatal("expected no pending request before one is created")
+	}
+
+	req := &models.ProductAdminRequest{
+		ID: uuid.NewString(), ProductID: p.ID, SubjectUserID: subject.ID, RequestedByUserID: requester.ID,
+		Status: models.ProductAdminRequestPending, CreatedAt: time.Now().UTC(),
+	}
+	if err := reqRepo.Create(context.Background(), req); err != nil {
+		t.Fatalf("create request: %v", err)
+	}
+
+	hasPending, err = reqRepo.HasPending(context.Background(), p.ID, subject.ID)
+	if err != nil {
+		t.Fatalf("has pending (after): %v", err)
+	}
+	if !hasPending {
+		t.Fatal("expected a pending request after creating one")
+	}
+
+	pending, err := reqRepo.ListPendingByProduct(context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("list pending: %v", err)
+	}
+	if len(pending) != 1 || pending[0].SubjectUserID != subject.ID {
+		t.Fatalf("expected one pending request for subject, got %+v", pending)
+	}
+
+	if err := reqRepo.SetStatus(context.Background(), req.ID, models.ProductAdminRequestApproved, requester.ID); err != nil {
+		t.Fatalf("set status: %v", err)
+	}
+
+	got, err := reqRepo.GetByID(context.Background(), req.ID)
+	if err != nil {
+		t.Fatalf("get by id: %v", err)
+	}
+	if got.Status != models.ProductAdminRequestApproved {
+		t.Fatalf("expected status approved, got %q", got.Status)
+	}
+	if got.DecidedByUserID == nil || *got.DecidedByUserID != requester.ID {
+		t.Fatalf("expected decided_by_user_id set, got %+v", got.DecidedByUserID)
+	}
+
+	hasPending, err = reqRepo.HasPending(context.Background(), p.ID, subject.ID)
+	if err != nil {
+		t.Fatalf("has pending (after decide): %v", err)
+	}
+	if hasPending {
+		t.Fatal("expected no pending request after it was decided")
+	}
+}
