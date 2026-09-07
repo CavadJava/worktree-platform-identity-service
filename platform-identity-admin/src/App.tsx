@@ -2,7 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
-import { RequireSystemAdmin } from './auth/RequireSystemAdmin';
+import { RequireSuperadmin } from './auth/RequireSuperadmin';
+import { RequireAdminOrAbove } from './auth/RequireAdminOrAbove';
 import { AppLayout } from './layouts/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { ShopsPage } from './pages/ShopsPage';
@@ -17,11 +18,11 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWind
 // send them there instead of the system-admin default of /shops.
 function DefaultRedirect() {
   const { claims, myShopId } = useAuth();
-  const isSystemAdmin = claims?.system_role === 'admin' || claims?.system_role === 'superadmin';
-  if (!isSystemAdmin && myShopId) {
+  const isAdminOrAbove = claims?.system_role === 'admin' || claims?.system_role === 'superadmin';
+  if (!isAdminOrAbove && myShopId) {
     return <Navigate to={`/shops/${myShopId}/members`} replace />;
   }
-  return <Navigate to="/shops" replace />;
+  return <Navigate to="/products" replace />;
 }
 
 export function App() {
@@ -35,9 +36,11 @@ export function App() {
               <Route element={<AppLayout />}>
                 <Route index element={<DefaultRedirect />} />
                 <Route path="/shops/:id/members" element={<ShopMembersPage />} />
-                <Route element={<RequireSystemAdmin />}>
-                  <Route path="/shops" element={<ShopsPage />} />
+                <Route element={<RequireAdminOrAbove />}>
                   <Route path="/products" element={<ProductsPage />} />
+                </Route>
+                <Route element={<RequireSuperadmin />}>
+                  <Route path="/shops" element={<ShopsPage />} />
                   <Route path="/users" element={<UsersPage />} />
                 </Route>
               </Route>

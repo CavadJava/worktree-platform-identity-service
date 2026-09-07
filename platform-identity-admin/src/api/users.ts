@@ -1,5 +1,5 @@
 import { platformIdentityApi } from './httpClients';
-import type { Member, User } from './types';
+import type { BasicUser, Member, User } from './types';
 
 export async function listAllUsers(): Promise<User[]> {
   const response = await platformIdentityApi.get<User[]>('/users');
@@ -8,6 +8,11 @@ export async function listAllUsers(): Promise<User[]> {
 
 export async function getUser(id: string): Promise<User> {
   const response = await platformIdentityApi.get<User>(`/users/${id}`);
+  return response.data;
+}
+
+export async function listBasicUsers(): Promise<BasicUser[]> {
+  const response = await platformIdentityApi.get<BasicUser[]>('/users/basic');
   return response.data;
 }
 

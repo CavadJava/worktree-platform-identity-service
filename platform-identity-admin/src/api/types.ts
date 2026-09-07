@@ -43,6 +43,28 @@ export interface Subscription {
   notes: string;
 }
 
+export interface ProductAdminRequest {
+  id: string;
+  product_id: string;
+  subject_user_id: string;
+  requested_by_user_id: string;
+  status: string;
+  created_at: string;
+}
+
+export interface ProductBrowse {
+  id: string;
+  name: string;
+}
+
+export interface BasicUser {
+  id: string;
+  name: string;
+  username: string;
+  email: string;
+  system_role: string;
+}
+
 export interface Member {
   id: string;
   user_id: string;

@@ -1,5 +1,5 @@
 import { platformIdentityApi } from './httpClients';
-import type { Product, Subproject, Subscription } from './types';
+import type { Product, Subproject, Subscription, ProductAdminRequest, ProductBrowse } from './types';
 
 export async function listProducts(): Promise<Product[]> {
   const response = await platformIdentityApi.get<Product[]>('/products');
@@ -65,13 +65,52 @@ export async function createProductUser(
   name: string,
   username: string,
   email: string,
-  password: string
+  password: string,
+  systemRole: string
 ): Promise<{ user_id: string; product_id: string; subscripted: boolean; renewed: boolean }> {
   const response = await platformIdentityApi.post(`/products/${productId}/users`, {
     name,
     username,
     email,
     password,
+    system_role: systemRole,
+  });
+  return response.data;
+}
+
+export async function listMyProducts(): Promise<Product[]> {
+  const response = await platformIdentityApi.get<Product[]>('/products/mine');
+  return response.data;
+}
+
+export async function listBrowseProducts(): Promise<ProductBrowse[]> {
+  const response = await platformIdentityApi.get<ProductBrowse[]>('/products/browse');
+  return response.data;
+}
+
+export async function requestProductAdmin(productId: string, subjectUserId: string): Promise<ProductAdminRequest> {
+  const response = await platformIdentityApi.post<ProductAdminRequest>(`/products/${productId}/admin-requests`, {
+    subject_user_id: subjectUserId,
+  });
+  return response.data;
+}
+
+export async function listAdminRequests(productId: string): Promise<ProductAdminRequest[]> {
+  const response = await platformIdentityApi.get<ProductAdminRequest[]>(`/products/${productId}/admin-requests`);
+  return response.data;
+}
+
+export async function decideAdminRequest(productId: string, requestId: string, approve: boolean): Promise<ProductAdminRequest> {
+  const response = await platformIdentityApi.post<ProductAdminRequest>(
+    `/products/${productId}/admin-requests/${requestId}/decide`,
+    { approve }
+  );
+  return response.data;
+}
+
+export async function promoteProductAdmin(productId: string, subjectUserId: string): Promise<Subscription> {
+  const response = await platformIdentityApi.post<Subscription>(`/products/${productId}/admin`, {
+    subject_user_id: subjectUserId,
   });
   return response.data;
 }
