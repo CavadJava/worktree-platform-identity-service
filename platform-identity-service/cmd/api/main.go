@@ -60,13 +60,14 @@ func main() {
 	subprojectRepo := repository.NewSubprojectRepository(db)
 	systemRoleRepo := repository.NewSystemRoleRepository(db)
 	shopRoleRepo := repository.NewShopRoleRepository(db)
+	productAdminRequestRepo := repository.NewProductAdminRequestRepository(db)
 	jwtManager := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTTTLMinutes)
 
 	authService := service.NewAuthService(userRepo, jwtManager)
 	userService := service.NewUserService(userRepo)
 	shopService := service.NewShopService(shopRepo)
 	membershipService := service.NewShopMembershipService(membershipRepo, userRepo, shopRepo, authService, userService)
-	productService := service.NewProductService(productRepo, subscriptionRepo, subprojectRepo, authService)
+	productService := service.NewProductService(productRepo, subscriptionRepo, subprojectRepo, productAdminRequestRepo, userRepo, authService)
 	systemRoleService := service.NewSystemRoleService(systemRoleRepo)
 	shopRoleService := service.NewShopRoleService(shopRoleRepo)
 

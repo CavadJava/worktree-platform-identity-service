@@ -17,8 +17,9 @@ func newTestProductService(t *testing.T) *ProductService {
 	productRepo := repository.NewProductRepository(db)
 	subRepo := repository.NewSubscriptionRepository(db)
 	subprojRepo := repository.NewSubprojectRepository(db)
+	reqRepo := repository.NewProductAdminRequestRepository(db)
 	authSvc := NewAuthService(userRepo, newTestJWTManager())
-	return NewProductService(productRepo, subRepo, subprojRepo, authSvc)
+	return NewProductService(productRepo, subRepo, subprojRepo, reqRepo, userRepo, authSvc)
 }
 
 func TestProductService_UpdateProfile_RequiresSuperadmin(t *testing.T) {
@@ -53,11 +54,11 @@ func TestProductService_CreateUserAndSubscribe(t *testing.T) {
 
 	in := CreateUserInput{Name: "New User", Username: "newuser-" + p.ID, Email: "newuser-" + p.ID + "@example.com", Password: "password123"}
 
-	if _, err := svc.CreateUserAndSubscribe(context.Background(), nonAdmin, p.ID, in); !errors.Is(err, ErrForbidden) {
+	if _, err := svc.CreateUserAndSubscribe(context.Background(), nonAdmin, p.ID, in, models.SystemRoleUser); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("expected ErrForbidden for non-superadmin, got %v", err)
 	}
 
-	sub, err := svc.CreateUserAndSubscribe(context.Background(), superadmin, p.ID, in)
+	sub, err := svc.CreateUserAndSubscribe(context.Background(), superadmin, p.ID, in, models.SystemRoleUser)
 	if err != nil {
 		t.Fatalf("create user and subscribe: %v", err)
 	}
@@ -170,5 +171,120 @@ func TestProductService_AdminWithSubscriptionCanManageTheirProduct(t *testing.T)
 	otherAdmin := shopassign.Caller{UserID: otherAdminUser.ID, SystemRole: models.SystemRoleAdmin}
 	if _, err := svc.UpdateProfile(context.Background(), otherAdmin, p.ID, "x", "y"); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("expected ErrForbidden for unsubscribed admin, got %v", err)
+	}
+}
+
+func TestProductService_RequestApprovePromoteFlow(t *testing.T) {
+	svc := newTestProductService(t)
+	p, err := svc.Create(context.Background(), "Teslahubs")
+	if err != nil {
+		t.Fatalf("create product: %v", err)
+	}
+	superadminUser, err := svc.authSvc.CreateUser(context.Background(), CreateUserInput{
+		Name:       "Superadmin",
+		Username:   "superadmin-" + p.ID,
+		Email:      "superadmin-" + p.ID + "@example.com",
+		Password:   "password123",
+		SystemRole: models.SystemRoleSuperadmin,
+	})
+	if err != nil {
+		t.Fatalf("create superadmin user: %v", err)
+	}
+	superadmin := shopassign.Caller{UserID: superadminUser.ID, SystemRole: models.SystemRoleSuperadmin}
+
+	// Create a plain 'user' subject via the existing product-scoped creation path.
+	newUserSub, err := svc.CreateUserAndSubscribe(context.Background(), superadmin, p.ID, CreateUserInput{
+		Name: "Subject", Username: "subject-" + p.ID, Email: "subject-" + p.ID + "@example.com", Password: "password123",
+	}, models.SystemRoleUser)
+	if err != nil {
+		t.Fatalf("create subject user: %v", err)
+	}
+	_ = newUserSub
+
+	// The subject already has a subscription (from CreateUserAndSubscribe), so
+	// build a second, unsubscribed target product to test the request flow on.
+	p2, err := svc.Create(context.Background(), "ESound")
+	if err != nil {
+		t.Fatalf("create second product: %v", err)
+	}
+
+	adminUser, err := svc.authSvc.CreateUser(context.Background(), CreateUserInput{
+		Name:       "Requesting Admin",
+		Username:   "req-admin-" + p.ID,
+		Email:      "req-admin-" + p.ID + "@example.com",
+		Password:   "password123",
+		SystemRole: models.SystemRoleAdmin,
+	})
+	if err != nil {
+		t.Fatalf("create admin user: %v", err)
+	}
+	admin := shopassign.Caller{UserID: adminUser.ID, SystemRole: models.SystemRoleAdmin}
+	// admin has no subscription to p2 yet, so filing a request must fail.
+	if _, err := svc.RequestProductAdmin(context.Background(), admin, p2.ID, "some-user-id"); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden for admin unsubscribed to the product, got %v", err)
+	}
+
+	// Subscribe the admin to p2, then they can file a request for someone else.
+	if _, err := svc.SetSubscription(context.Background(), superadmin, admin.UserID, p2.ID, true, false, ""); err != nil {
+		t.Fatalf("subscribe admin to p2: %v", err)
+	}
+
+	req, err := svc.RequestProductAdmin(context.Background(), admin, p2.ID, newUserSub.UserID)
+	if err != nil {
+		t.Fatalf("request product admin: %v", err)
+	}
+	if req.Status != models.ProductAdminRequestPending {
+		t.Fatalf("expected pending status, got %q", req.Status)
+	}
+
+	// A second request for the same pending pair must fail.
+	if _, err := svc.RequestProductAdmin(context.Background(), admin, p2.ID, newUserSub.UserID); !errors.Is(err, ErrRequestAlreadyPending) {
+		t.Fatalf("expected ErrRequestAlreadyPending, got %v", err)
+	}
+
+	// A plain admin cannot decide.
+	if _, err := svc.DecideRequest(context.Background(), admin, req.ID, true); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden for admin deciding, got %v", err)
+	}
+
+	decided, err := svc.DecideRequest(context.Background(), superadmin, req.ID, true)
+	if err != nil {
+		t.Fatalf("decide request: %v", err)
+	}
+	if decided.Status != models.ProductAdminRequestApproved {
+		t.Fatalf("expected approved status, got %q", decided.Status)
+	}
+
+	access, err := svc.CheckAccess(context.Background(), newUserSub.UserID, p2.ID)
+	if err != nil {
+		t.Fatalf("check access after approval: %v", err)
+	}
+	if access != AccessFull {
+		t.Fatalf("expected full access to p2 after approval, got %q", access)
+	}
+}
+
+func TestProductService_PromoteDirectly_SuperadminOnly(t *testing.T) {
+	svc := newTestProductService(t)
+	p, err := svc.Create(context.Background(), "Vault")
+	if err != nil {
+		t.Fatalf("create product: %v", err)
+	}
+	superadmin := shopassign.Caller{SystemRole: models.SystemRoleSuperadmin}
+	admin := shopassign.Caller{SystemRole: models.SystemRoleAdmin}
+
+	sub, err := svc.CreateUserAndSubscribe(context.Background(), superadmin, p.ID, CreateUserInput{
+		Name: "Direct Subject", Username: "direct-" + p.ID, Email: "direct-" + p.ID + "@example.com", Password: "password123",
+	}, models.SystemRoleUser)
+	if err != nil {
+		t.Fatalf("create subject: %v", err)
+	}
+
+	if _, err := svc.PromoteDirectly(context.Background(), admin, p.ID, sub.UserID); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden for admin calling PromoteDirectly, got %v", err)
+	}
+
+	if _, err := svc.PromoteDirectly(context.Background(), superadmin, p.ID, sub.UserID); err != nil {
+		t.Fatalf("promote directly: %v", err)
 	}
 }
