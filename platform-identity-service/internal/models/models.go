@@ -76,6 +76,23 @@ type ProductSubproject struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+const (
+	ProductAdminRequestPending  = "pending"
+	ProductAdminRequestApproved = "approved"
+	ProductAdminRequestRejected = "rejected"
+)
+
+type ProductAdminRequest struct {
+	ID                string
+	ProductID         string
+	SubjectUserID     string
+	RequestedByUserID string
+	Status            string
+	CreatedAt         time.Time
+	DecidedAt         *time.Time
+	DecidedByUserID   *string
+}
+
 type Subscription struct {
 	ID          string
 	UserID      string

@@ -98,6 +98,19 @@ func Migrate(db *sql.DB) error {
 		);
 		CREATE INDEX IF NOT EXISTS idx_subprojects_product_id ON product_subprojects (product_id);
 
+		CREATE TABLE IF NOT EXISTS product_admin_requests (
+			id UUID PRIMARY KEY,
+			product_id UUID NOT NULL REFERENCES products(id),
+			subject_user_id UUID NOT NULL REFERENCES users(id),
+			requested_by_user_id UUID NOT NULL REFERENCES users(id),
+			status TEXT NOT NULL DEFAULT 'pending',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			decided_at TIMESTAMPTZ,
+			decided_by_user_id UUID REFERENCES users(id)
+		);
+		CREATE INDEX IF NOT EXISTS idx_product_admin_requests_product_id ON product_admin_requests (product_id);
+		CREATE INDEX IF NOT EXISTS idx_product_admin_requests_status ON product_admin_requests (status);
+
 		CREATE TABLE IF NOT EXISTS user_product_subscriptions (
 			id UUID PRIMARY KEY,
 			user_id UUID NOT NULL REFERENCES users(id),

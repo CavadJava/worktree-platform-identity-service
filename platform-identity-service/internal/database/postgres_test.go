@@ -64,3 +64,35 @@ func TestMigrate_ProductProfileColumnsAndSubprojectsTable(t *testing.T) {
 		t.Fatalf("insert subproject: %v", err)
 	}
 }
+
+func TestMigrate_ProductAdminRequestsTable(t *testing.T) {
+	db := testMigrateDB(t)
+	if err := Migrate(db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	var productID, userID string
+	if err := db.QueryRow(`INSERT INTO products (id, name, created_at) VALUES (gen_random_uuid(), 'Req Product', now()) RETURNING id`).Scan(&productID); err != nil {
+		t.Fatalf("insert product: %v", err)
+	}
+	if err := db.QueryRow(`
+		INSERT INTO users (id, name, username, email, password_hash, system_role_id, status, created_at, updated_at)
+		VALUES (gen_random_uuid(), 'Req User', 'requser-'||gen_random_uuid(), 'requser-'||gen_random_uuid()||'@example.com', 'x', 3, 'ACTIVE', now(), now())
+		RETURNING id
+	`).Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+
+	var reqID, status string
+	err := db.QueryRow(`
+		INSERT INTO product_admin_requests (id, product_id, subject_user_id, requested_by_user_id, status, created_at)
+		VALUES (gen_random_uuid(), $1, $2, $2, 'pending', now())
+		RETURNING id, status
+	`, productID, userID).Scan(&reqID, &status)
+	if err != nil {
+		t.Fatalf("insert request: %v", err)
+	}
+	if status != "pending" {
+		t.Fatalf("expected default status 'pending', got %q", status)
+	}
+}
