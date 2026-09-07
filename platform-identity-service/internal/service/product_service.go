@@ -287,11 +287,11 @@ func (s *ProductService) RequestProductAdmin(ctx context.Context, caller shopass
 	return req, nil
 }
 
-// ListPendingRequests is superadmin-only — an admin sees the same list
-// read-only through a different, unrestricted-read handler wiring (Task 6
-// exposes GET .../admin-requests to admin and superadmin alike, but only
-// superadmin can call DecideRequest).
-func (s *ProductService) ListPendingRequests(ctx context.Context, caller shopassign.Caller, productID string) ([]models.ProductAdminRequest, error) {
+// ListPendingRequests retrieves pending admin requests for a product.
+// This method has no built-in authorization check; the caller layer
+// (Task 6 handler) gates read access for admin vs superadmin, but both
+// call this method the same way. Only DecideRequest enforces superadmin-only.
+func (s *ProductService) ListPendingRequests(ctx context.Context, productID string) ([]models.ProductAdminRequest, error) {
 	return s.reqRepo.ListPendingByProduct(ctx, productID)
 }
 

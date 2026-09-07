@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/frontend/workspace/go-project-practices/.claude/worktrees/platform-identity-service/docs/superpowers/specs)",
+      "Bash(git -C /Users/frontend/workspace/go-project-practices/.claude/worktrees/platform-identity-service add docs/superpowers/specs/2026-09-07-product-scoped-admin-design.md)",
+      "Bash(git -C /Users/frontend/workspace/go-project-practices/.claude/worktrees/platform-identity-service commit -m ' *)",
+      "Bash(git -C /Users/frontend/workspace/go-project-practices/.claude/worktrees/platform-identity-service add docs/superpowers/plans/2026-09-07-product-scoped-admin.md)"
+    ],
+    "additionalDirectories": [
+      "/Users/frontend/workspace/go-project-practices/.claude/worktrees/platform-identity-service/docs/superpowers/specs"
+    ]
+  }
+}
