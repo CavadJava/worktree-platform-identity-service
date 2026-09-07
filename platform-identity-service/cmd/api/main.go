@@ -135,6 +135,13 @@ func main() {
 			r.Post("/products/{id}/subprojects", productHandler.AddSubproject)
 			r.Delete("/products/{id}/subprojects/{subId}", productHandler.RemoveSubproject)
 			r.Post("/products/{id}/users", productHandler.CreateUserAndSubscribe)
+
+			r.Get("/products/mine", productHandler.ListMine)
+			r.Get("/products/browse", productHandler.ListBrowse)
+			r.Post("/products/{id}/admin-requests", productHandler.RequestAdmin)
+			r.Get("/products/{id}/admin-requests", productHandler.ListAdminRequests)
+			r.Post("/products/{id}/admin-requests/{requestId}/decide", productHandler.DecideAdminRequest)
+			r.Post("/products/{id}/admin", productHandler.PromoteAdmin)
 		})
 	})
 
