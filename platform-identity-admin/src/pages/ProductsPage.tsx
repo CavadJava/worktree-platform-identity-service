@@ -221,7 +221,7 @@ export function ProductsPage() {
                     size="small"
                     onClick={() => {
                       setPromoteModalProduct(p as Product);
-                      setPromoteUserId(claims?.user_id ?? null);
+                      setPromoteUserId(null);
                     }}
                   >
                     Sorğu göndər
