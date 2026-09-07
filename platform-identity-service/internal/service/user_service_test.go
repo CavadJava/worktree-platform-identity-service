@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -219,5 +220,28 @@ func TestUserService_UpdateProfile_SuperadminCanEditAnyone(t *testing.T) {
 	}
 	if updated.Email != newEmail {
 		t.Errorf("expected email %q, got %q", newEmail, updated.Email)
+	}
+}
+
+func TestUserService_ListBasic_AllowsAdminNotJustSuperadmin(t *testing.T) {
+	userSvc, authSvc := newTestUserService(t)
+
+	_, err := authSvc.Register(context.Background(), RegisterInput{
+		Name: "Someone", Username: "someone-" + uuid.NewString(), Email: uuid.NewString() + "@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register failed: %v", err)
+	}
+
+	admin := shopassign.Caller{SystemRole: models.SystemRoleAdmin}
+	users, err := userSvc.ListBasic(context.Background(), admin)
+	if err != nil {
+		t.Fatalf("expected admin to list basic users, got %v", err)
+	}
+	_ = users
+
+	plainUser := shopassign.Caller{SystemRole: models.SystemRoleUser}
+	if _, err := userSvc.ListBasic(context.Background(), plainUser); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden for plain user, got %v", err)
 	}
 }

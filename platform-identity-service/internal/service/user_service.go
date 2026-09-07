@@ -48,6 +48,18 @@ func (s *UserService) ListAll(ctx context.Context, caller shopassign.Caller) ([]
 	return s.repo.ListAll(ctx)
 }
 
+// ListBasic is a narrower listing than ListAll: no shop-membership data,
+// available to admin as well as superadmin — an admin managing a product
+// needs to pick a subject user (for a subscription or an admin-request)
+// without gaining visibility into everyone's shop memberships, which
+// ListAll's superadmin-only gate exists specifically to protect.
+func (s *UserService) ListBasic(ctx context.Context, caller shopassign.Caller) ([]models.User, error) {
+	if caller.SystemRole != models.SystemRoleAdmin && caller.SystemRole != models.SystemRoleSuperadmin {
+		return nil, ErrForbidden
+	}
+	return s.repo.ListAll(ctx)
+}
+
 func (s *UserService) SetSystemRole(ctx context.Context, caller shopassign.Caller, targetUserID, newSystemRoleName string) (*models.User, error) {
 	if caller.SystemRole != models.SystemRoleSuperadmin {
 		return nil, ErrForbidden

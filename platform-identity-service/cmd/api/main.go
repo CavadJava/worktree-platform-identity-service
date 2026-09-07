@@ -113,6 +113,7 @@ func main() {
 
 			r.Get("/users/{id}", userHandler.Get)
 			r.Get("/users", userHandler.ListAll)
+			r.Get("/users/basic", userHandler.ListBasic)
 			r.Post("/users", authHandler.CreateUser)
 			r.Post("/users/{id}/system-role", userHandler.SetSystemRole)
 			r.Post("/users/{id}/status", userHandler.SetStatus)

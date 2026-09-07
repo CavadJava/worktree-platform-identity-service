@@ -100,6 +100,43 @@ func (h *UserHandler) ListAll(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
+type userBasicResponse struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Username   string `json:"username"`
+	Email      string `json:"email"`
+	SystemRole string `json:"system_role"`
+}
+
+// ListBasic godoc
+// @Summary      List every user, without shop-membership data
+// @Description  Admin or superadmin.
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200 {array} userBasicResponse
+// @Failure      403 {object} map[string]string
+// @Router       /users/basic [get]
+func (h *UserHandler) ListBasic(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	users, err := h.svc.ListBasic(r.Context(), caller)
+	if err != nil {
+		writeUserServiceError(w, err)
+		return
+	}
+
+	response := make([]userBasicResponse, len(users))
+	for i, u := range users {
+		response[i] = userBasicResponse{ID: u.ID, Name: u.Name, Username: u.Username, Email: u.Email, SystemRole: u.SystemRoleName}
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
 type setSystemRoleRequest struct {
 	SystemRole string `json:"system_role"`
 }
