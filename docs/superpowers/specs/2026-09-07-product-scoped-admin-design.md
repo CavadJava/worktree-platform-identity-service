@@ -60,11 +60,19 @@ request an `admin` files that a `superadmin` approves.
 - **Rejecting a request** simply marks it rejected and leaves the subject's role and
   subscriptions untouched. A rejected request does not block a future new request for
   the same (user, product) pair.
-- **The existing "Subscription idarə et" and "Yeni istifadəçi" actions on the Products
-  page are unaffected in shape** — an `admin` can still use them freely for products
-  they already manage; those actions do not touch `system_role` and were never gated
-  by superadmin approval. Only the *new* "make this user an admin for this product"
-  action goes through the request/approval path.
+- **The existing "Subscription idarə et" action is unaffected in shape** — an `admin`
+  can still use it freely for products they already manage; it does not touch
+  `system_role` and was never gated by superadmin approval.
+- **"Yeni istifadəçi" gains a system-role choice at creation time, exempt from the
+  request/approval path.** Today it always creates a brand-new account as `user`.
+  Going forward, whoever creates it (`admin` or `superadmin`, for a product they
+  manage) may pick `user` or `admin` as the new account's system role, decided
+  immediately, no request created. This is deliberately different from promoting an
+  *existing* user — a brand-new account has no prior state to protect, so there is
+  nothing here for a `superadmin` to gate: the request/approval path exists
+  specifically for *elevating an existing `user`*, not for choosing a new account's
+  starting role. Only the "make this existing user an admin for this product" action
+  (new user picker + Admin təyin et / Sorğu göndər) goes through request/approval.
 
 ## Data model
 
@@ -118,6 +126,10 @@ to keep the migration simple and additive.
     (*models.Subscription, error)` — `superadmin`-only direct path (no request
     row created at all): sets `system_role=admin` + upserts subscription, same
     end effect as an approved request.
+  - `CreateUserAndSubscribe` (existing method) gains a `systemRole string` param —
+    caller (`admin` or `superadmin`, for a product they manage) passes `"user"` or
+    `"admin"`; validated against the same two values, no request/approval involved
+    since the account does not exist yet.
 - New handler routes, all under the existing authenticated group:
   - `GET /products/mine` — list scoped to caller (`admin` sees only their own,
     `superadmin` sees all). Replaces the plain `GET /products` as what the panel's
@@ -160,6 +172,11 @@ to keep the migration simple and additive.
   second, clearly-separated "Bütün productlar" read-only list below it) listing
   every product by name only, each with a "Sorğu göndər" action targeting
   themselves as the subject.
+- The existing "Yeni istifadəçi" modal gains a system-role `Select` (`user` /
+  `admin`, defaulting to `user` to match today's behavior) — available to whoever
+  can open the modal (`admin` or `superadmin`, for a product they manage). No
+  request/approval step for this choice, since it only affects the brand-new
+  account being created, not an existing user.
 
 ## Out of scope (explicitly deferred, not silently dropped)
 
