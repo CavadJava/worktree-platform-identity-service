@@ -30,6 +30,30 @@ func (r *SubscriptionRepository) Upsert(ctx context.Context, s *models.Subscript
 	return err
 }
 
+// ListProductIDsByUser returns every product_id userID holds a subscription
+// row for, regardless of Subscripted's value — an admin managing a
+// product they were subscribed-then-unsubscribed from still manages it in
+// this scoping sense (a separate concern from whether their own account
+// has "full" product access, which CheckAccess covers).
+func (r *SubscriptionRepository) ListProductIDsByUser(ctx context.Context, userID string) ([]string, error) {
+	const q = `SELECT product_id FROM user_product_subscriptions WHERE user_id = $1`
+	rows, err := r.db.QueryContext(ctx, q, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func (r *SubscriptionRepository) GetByUserAndProduct(ctx context.Context, userID, productID string) (*models.Subscription, error) {
 	const q = `
 		SELECT id, user_id, product_id, subscripted, renewed, notes, created_at, updated_at

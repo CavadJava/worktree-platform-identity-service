@@ -84,6 +84,33 @@ func (s *ProductService) List(ctx context.Context) ([]models.Product, error) {
 	return s.productRepo.List(ctx)
 }
 
+// ListForCaller returns every product a superadmin may see, or only the
+// products an admin holds a subscription to.
+func (s *ProductService) ListForCaller(ctx context.Context, caller shopassign.Caller) ([]models.Product, error) {
+	if caller.SystemRole == models.SystemRoleSuperadmin {
+		return s.productRepo.List(ctx)
+	}
+	productIDs, err := s.subRepo.ListProductIDsByUser(ctx, caller.UserID)
+	if err != nil {
+		return nil, err
+	}
+	all, err := s.productRepo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	idSet := make(map[string]bool, len(productIDs))
+	for _, id := range productIDs {
+		idSet[id] = true
+	}
+	filtered := make([]models.Product, 0, len(productIDs))
+	for _, p := range all {
+		if idSet[p.ID] {
+			filtered = append(filtered, p)
+		}
+	}
+	return filtered, nil
+}
+
 // UpdateProfile lets a superadmin or an admin who holds a subscription to the product set a product's description and tech
 // stack. Both fields are always submitted together by the admin panel form.
 func (s *ProductService) UpdateProfile(ctx context.Context, caller shopassign.Caller, productID, description, techStack string) (*models.Product, error) {

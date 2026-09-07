@@ -180,7 +180,7 @@ func (h *ProductHandler) SetSubscription(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrForbidden):
-			writeError(w, http.StatusForbidden, "superadmin or admin role required")
+			writeError(w, http.StatusForbidden, "not permitted to manage this product")
 		case errors.Is(err, repository.ErrProductNotFound):
 			writeError(w, http.StatusNotFound, "product not found")
 		default:
@@ -228,7 +228,7 @@ func (h *ProductHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrForbidden):
-			writeError(w, http.StatusForbidden, "superadmin role required")
+			writeError(w, http.StatusForbidden, "not permitted to manage this product")
 		case errors.Is(err, repository.ErrProductNotFound):
 			writeError(w, http.StatusNotFound, "product not found")
 		default:
@@ -286,7 +286,7 @@ func (h *ProductHandler) AddSubproject(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrForbidden):
-			writeError(w, http.StatusForbidden, "superadmin role required")
+			writeError(w, http.StatusForbidden, "not permitted to manage this product")
 		case errors.Is(err, repository.ErrProductNotFound):
 			writeError(w, http.StatusNotFound, "product not found")
 		default:
@@ -347,7 +347,7 @@ func (h *ProductHandler) RemoveSubproject(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrForbidden):
-			writeError(w, http.StatusForbidden, "superadmin role required")
+			writeError(w, http.StatusForbidden, "not permitted to manage this product")
 		case errors.Is(err, repository.ErrSubprojectNotFound):
 			writeError(w, http.StatusNotFound, "subproject not found")
 		default:
@@ -359,10 +359,11 @@ func (h *ProductHandler) RemoveSubproject(w http.ResponseWriter, r *http.Request
 }
 
 type createProductUserRequest struct {
-	Name     string `json:"name"`
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Name       string `json:"name"`
+	Username   string `json:"username"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	SystemRole string `json:"system_role"`
 }
 
 // CreateUserAndSubscribe godoc
@@ -394,15 +395,23 @@ func (h *ProductHandler) CreateUserAndSubscribe(w http.ResponseWriter, r *http.R
 		writeError(w, http.StatusBadRequest, "name, username, email and password are required")
 		return
 	}
+	systemRole := req.SystemRole
+	if systemRole == "" {
+		systemRole = models.SystemRoleUser
+	}
+	if systemRole != models.SystemRoleUser && systemRole != models.SystemRoleAdmin {
+		writeError(w, http.StatusBadRequest, "system_role must be 'user' or 'admin'")
+		return
+	}
 
 	productID := chi.URLParam(r, "id")
 	sub, err := h.svc.CreateUserAndSubscribe(r.Context(), caller, productID, service.CreateUserInput{
 		Name: req.Name, Username: req.Username, Email: req.Email, Password: req.Password,
-	})
+	}, systemRole)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrForbidden):
-			writeError(w, http.StatusForbidden, "superadmin role required")
+			writeError(w, http.StatusForbidden, "not permitted to manage this product")
 		case errors.Is(err, repository.ErrProductNotFound):
 			writeError(w, http.StatusNotFound, "product not found")
 		case errors.Is(err, service.ErrUsernameTaken):
@@ -415,6 +424,245 @@ func (h *ProductHandler) CreateUserAndSubscribe(w http.ResponseWriter, r *http.R
 		return
 	}
 	writeJSON(w, http.StatusCreated, subscriptionResponse{
+		UserID: sub.UserID, ProductID: sub.ProductID, Subscripted: sub.Subscripted, Renewed: sub.Renewed, Notes: sub.Notes,
+	})
+}
+
+// ListMine godoc
+// @Summary      List products the caller may administer
+// @Description  Superadmin sees every product; admin sees only products they hold a subscription to.
+// @Tags         products
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200 {array} productResponse
+// @Router       /products/mine [get]
+func (h *ProductHandler) ListMine(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	products, err := h.svc.ListForCaller(r.Context(), caller)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list products")
+		return
+	}
+
+	response := make([]productResponse, len(products))
+	for i, p := range products {
+		response[i] = toProductResponse(&p)
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+type productBrowseResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ListBrowse godoc
+// @Summary      Read-only list of every product's id and name
+// @Description  Any authenticated caller — lets an admin with no subscriptions see what products exist.
+// @Tags         products
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200 {array} productBrowseResponse
+// @Router       /products/browse [get]
+func (h *ProductHandler) ListBrowse(w http.ResponseWriter, r *http.Request) {
+	products, err := h.svc.List(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list products")
+		return
+	}
+	response := make([]productBrowseResponse, len(products))
+	for i, p := range products {
+		response[i] = productBrowseResponse{ID: p.ID, Name: p.Name}
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+type requestAdminRequest struct {
+	SubjectUserID string `json:"subject_user_id"`
+}
+
+type productAdminRequestResponse struct {
+	ID                string `json:"id"`
+	ProductID         string `json:"product_id"`
+	SubjectUserID     string `json:"subject_user_id"`
+	RequestedByUserID string `json:"requested_by_user_id"`
+	Status            string `json:"status"`
+	CreatedAt         string `json:"created_at"`
+}
+
+func toProductAdminRequestResponse(req *models.ProductAdminRequest) productAdminRequestResponse {
+	return productAdminRequestResponse{
+		ID: req.ID, ProductID: req.ProductID, SubjectUserID: req.SubjectUserID,
+		RequestedByUserID: req.RequestedByUserID, Status: req.Status,
+		CreatedAt: req.CreatedAt.Format(timeFormat),
+	}
+}
+
+// RequestAdmin godoc
+// @Summary      Request that a user become admin for a product
+// @Description  Admin (managing this product) or superadmin. Requires superadmin approval to take effect.
+// @Tags         products
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Product ID"
+// @Param        request body requestAdminRequest true "Subject payload"
+// @Success      201 {object} productAdminRequestResponse
+// @Failure      403 {object} map[string]string
+// @Router       /products/{id}/admin-requests [post]
+func (h *ProductHandler) RequestAdmin(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req requestAdminRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.SubjectUserID == "" {
+		writeError(w, http.StatusBadRequest, "subject_user_id is required")
+		return
+	}
+
+	productID := chi.URLParam(r, "id")
+	created, err := h.svc.RequestProductAdmin(r.Context(), caller, productID, req.SubjectUserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			writeError(w, http.StatusForbidden, "not permitted to manage this product")
+		case errors.Is(err, service.ErrAlreadyHasAccess):
+			writeError(w, http.StatusConflict, "subject already has access to this product")
+		case errors.Is(err, service.ErrRequestAlreadyPending):
+			writeError(w, http.StatusConflict, "a pending request already exists for this user and product")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to create request")
+		}
+		return
+	}
+	writeJSON(w, http.StatusCreated, toProductAdminRequestResponse(created))
+}
+
+// ListAdminRequests godoc
+// @Summary      List pending admin requests for a product
+// @Tags         products
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Product ID"
+// @Success      200 {array} productAdminRequestResponse
+// @Router       /products/{id}/admin-requests [get]
+func (h *ProductHandler) ListAdminRequests(w http.ResponseWriter, r *http.Request) {
+	productID := chi.URLParam(r, "id")
+	requests, err := h.svc.ListPendingRequests(r.Context(), productID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list requests")
+		return
+	}
+	response := make([]productAdminRequestResponse, len(requests))
+	for i, req := range requests {
+		response[i] = toProductAdminRequestResponse(&req)
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+type decideAdminRequestRequest struct {
+	Approve bool `json:"approve"`
+}
+
+// DecideAdminRequest godoc
+// @Summary      Approve or reject a pending admin request
+// @Description  Superadmin only.
+// @Tags         products
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Product ID"
+// @Param        requestId path string true "Request ID"
+// @Param        request body decideAdminRequestRequest true "Decision payload"
+// @Success      200 {object} productAdminRequestResponse
+// @Failure      403 {object} map[string]string
+// @Router       /products/{id}/admin-requests/{requestId}/decide [post]
+func (h *ProductHandler) DecideAdminRequest(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req decideAdminRequestRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	requestID := chi.URLParam(r, "requestId")
+	decided, err := h.svc.DecideRequest(r.Context(), caller, requestID, req.Approve)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			writeError(w, http.StatusForbidden, "superadmin role required")
+		case errors.Is(err, repository.ErrProductAdminRequestNotFound):
+			writeError(w, http.StatusNotFound, "request not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to decide request")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, toProductAdminRequestResponse(decided))
+}
+
+type promoteAdminRequest struct {
+	SubjectUserID string `json:"subject_user_id"`
+}
+
+// PromoteAdmin godoc
+// @Summary      Directly promote a user to admin for a product
+// @Description  Superadmin only. No request is created — immediate effect.
+// @Tags         products
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Product ID"
+// @Param        request body promoteAdminRequest true "Subject payload"
+// @Success      200 {object} subscriptionResponse
+// @Failure      403 {object} map[string]string
+// @Router       /products/{id}/admin [post]
+func (h *ProductHandler) PromoteAdmin(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req promoteAdminRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.SubjectUserID == "" {
+		writeError(w, http.StatusBadRequest, "subject_user_id is required")
+		return
+	}
+
+	productID := chi.URLParam(r, "id")
+	sub, err := h.svc.PromoteDirectly(r.Context(), caller, productID, req.SubjectUserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			writeError(w, http.StatusForbidden, "superadmin role required")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to promote user")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, subscriptionResponse{
 		UserID: sub.UserID, ProductID: sub.ProductID, Subscripted: sub.Subscripted, Renewed: sub.Renewed, Notes: sub.Notes,
 	})
 }

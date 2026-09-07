@@ -46,13 +46,16 @@ func testProductRouter(t *testing.T) (chi.Router, *sql.DB, *auth.JWTManager) {
 	subprojRepo := repository.NewSubprojectRepository(db)
 	jwtManager := auth.NewJWTManager("product-handler-test-secret", 60)
 
+	reqRepo := repository.NewProductAdminRequestRepository(db)
 	authService := service.NewAuthService(userRepo, jwtManager)
-	productService := service.NewProductService(productRepo, subRepo, subprojRepo, authService)
+	productService := service.NewProductService(productRepo, subRepo, subprojRepo, reqRepo, userRepo, authService)
 	productHandler := NewProductHandler(productService)
+	authHandler := NewAuthHandler(authService)
 
 	r := chi.NewRouter()
 	r.Get("/api/v1/products", productHandler.List)
 	r.Get("/api/v1/products/{id}/subprojects", productHandler.ListSubprojects)
+	r.Post("/api/v1/auth/login", authHandler.Login)
 	r.Group(func(r chi.Router) {
 		r.Use(appmiddleware.RequireAuth(jwtManager, userRepo))
 		r.Post("/api/v1/products", productHandler.Create)
@@ -60,6 +63,12 @@ func testProductRouter(t *testing.T) (chi.Router, *sql.DB, *auth.JWTManager) {
 		r.Post("/api/v1/products/{id}/profile", productHandler.UpdateProfile)
 		r.Post("/api/v1/products/{id}/subprojects", productHandler.AddSubproject)
 		r.Delete("/api/v1/products/{id}/subprojects/{subId}", productHandler.RemoveSubproject)
+		r.Get("/api/v1/products/mine", productHandler.ListMine)
+		r.Get("/api/v1/products/browse", productHandler.ListBrowse)
+		r.Post("/api/v1/products/{id}/admin-requests", productHandler.RequestAdmin)
+		r.Get("/api/v1/products/{id}/admin-requests", productHandler.ListAdminRequests)
+		r.Post("/api/v1/products/{id}/admin-requests/{requestId}/decide", productHandler.DecideAdminRequest)
+		r.Post("/api/v1/products/{id}/admin", productHandler.PromoteAdmin)
 	})
 
 	t.Cleanup(func() { db.Close() })
@@ -171,5 +180,124 @@ func TestProductHandler_ProfileAndSubprojects(t *testing.T) {
 	rec = doJSON(t, r, http.MethodDelete, "/api/v1/products/"+created.ID+"/subprojects/"+sub.ID, token, nil)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("remove subproject: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func loginAs(t *testing.T, r chi.Router, username, password string) string {
+	t.Helper()
+	rec := doJSON(t, r, http.MethodPost, "/api/v1/auth/login", "", map[string]string{"identifier": username, "password": password})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("login as %s: expected 200, got %d: %s", username, rec.Code, rec.Body.String())
+	}
+	var env struct {
+		Data struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&env)
+	return env.Data.Token
+}
+
+func TestProductHandler_ScopedListAndAdminRequestFlow(t *testing.T) {
+	r, db, jwtManager := testProductRouter(t)
+	superToken := createTestSuperadmin(t, db, jwtManager)
+
+	// Create two products; only subscribe the admin to the first.
+	rec := doJSON(t, r, http.MethodPost, "/api/v1/products", superToken, map[string]string{"name": "Teslahubs"})
+	var p1Env struct {
+		Data productResponse `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&p1Env)
+	p1 := p1Env.Data
+
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/products", superToken, map[string]string{"name": "ESound"})
+	var p2Env struct {
+		Data productResponse `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&p2Env)
+	p2 := p2Env.Data
+
+	// Create a plain user via the product-user endpoint, requesting the
+	// 'admin' role directly (new-account exemption from request/approval).
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/products/"+p1.ID+"/users", superToken, map[string]string{
+		"name": "Admin User", "username": "adminuser-" + p1.ID, "email": "adminuser-" + p1.ID + "@example.com",
+		"password": "password123", "system_role": "admin",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create product user with admin role: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var adminSubEnv struct {
+		Data subscriptionResponse `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&adminSubEnv)
+	adminUserID := adminSubEnv.Data.UserID
+
+	adminToken := loginAs(t, r, "adminuser-"+p1.ID, "password123")
+
+	// The admin's scoped list only includes p1, not p2.
+	rec = doJSON(t, r, http.MethodGet, "/api/v1/products/mine", adminToken, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list mine: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var mineEnv struct {
+		Data []productResponse `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&mineEnv)
+	if len(mineEnv.Data) != 1 || mineEnv.Data[0].ID != p1.ID {
+		t.Fatalf("expected admin to see only p1, got %+v", mineEnv.Data)
+	}
+
+	// Browse list shows both, read-only.
+	rec = doJSON(t, r, http.MethodGet, "/api/v1/products/browse", adminToken, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("browse: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Superadmin creates a plain user subscribed to p2 only (not p1), so
+	// the user has no existing access to p1 — the admin then requests
+	// admin access for that user first on p2 (which the admin does NOT
+	// manage, must fail) and then on p1 (which the user still has no
+	// access to, and the admin does manage, must succeed).
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/products/"+p2.ID+"/users", superToken, map[string]string{
+		"name": "Plain User", "username": "plainuser-" + p1.ID, "email": "plainuser-" + p1.ID + "@example.com",
+		"password": "password123", "system_role": "user",
+	})
+	var plainSubEnv struct {
+		Data subscriptionResponse `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&plainSubEnv)
+	plainUserID := plainSubEnv.Data.UserID
+
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/products/"+p2.ID+"/admin-requests", adminToken, map[string]string{"subject_user_id": plainUserID})
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("request admin for unmanaged product: expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Requesting on p1 (which the admin does manage) succeeds.
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/products/"+p1.ID+"/admin-requests", adminToken, map[string]string{"subject_user_id": plainUserID})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("request admin: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var reqEnv struct {
+		Data productAdminRequestResponse `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&reqEnv)
+
+	// The admin cannot decide their own request.
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/products/"+p1.ID+"/admin-requests/"+reqEnv.Data.ID+"/decide", adminToken, map[string]bool{"approve": true})
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("admin deciding own request: expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Superadmin approves it.
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/products/"+p1.ID+"/admin-requests/"+reqEnv.Data.ID+"/decide", superToken, map[string]bool{"approve": true})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("superadmin decide: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Superadmin can also promote directly, with no request at all.
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/products/"+p2.ID+"/admin", superToken, map[string]string{"subject_user_id": adminUserID})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("promote directly: expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
