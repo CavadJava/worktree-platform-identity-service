@@ -70,6 +70,10 @@ func TestMigrate_ProductAdminRequestsTable(t *testing.T) {
 	if err := Migrate(db); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
+	// Running it twice must stay a no-op (idempotency guarantee).
+	if err := Migrate(db); err != nil {
+		t.Fatalf("second migrate: %v", err)
+	}
 
 	var productID, userID string
 	if err := db.QueryRow(`INSERT INTO products (id, name, created_at) VALUES (gen_random_uuid(), 'Req Product', now()) RETURNING id`).Scan(&productID); err != nil {
