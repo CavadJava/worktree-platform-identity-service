@@ -63,11 +63,12 @@ type ShopMembership struct {
 }
 
 type Product struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	TechStack   string    `json:"tech_stack"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Description   string    `json:"description"`
+	TechStack     string    `json:"tech_stack"`
+	AutoSubscribe bool      `json:"auto_subscribe"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type ProductSubproject struct {

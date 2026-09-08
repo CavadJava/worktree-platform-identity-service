@@ -100,6 +100,7 @@ func Migrate(db *sql.DB) error {
 		);
 		ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '';
 		ALTER TABLE products ADD COLUMN IF NOT EXISTS tech_stack TEXT NOT NULL DEFAULT '';
+		ALTER TABLE products ADD COLUMN IF NOT EXISTS auto_subscribe BOOLEAN NOT NULL DEFAULT false;
 
 		CREATE TABLE IF NOT EXISTS product_subprojects (
 			id UUID PRIMARY KEY,

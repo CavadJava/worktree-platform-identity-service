@@ -2,8 +2,12 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
 
 	"platform-identity-service/internal/models"
 	"platform-identity-service/internal/repository"
@@ -12,14 +16,50 @@ import (
 
 func newTestProductService(t *testing.T) *ProductService {
 	t.Helper()
-	db := testDB(t)
-	userRepo := repository.NewUserRepository(db)
-	productRepo := repository.NewProductRepository(db)
-	subRepo := repository.NewSubscriptionRepository(db)
+	svc, _, _, _, _ := newTestProductServiceWithRepos(t)
+	return svc
+}
+
+// newTestProductServiceWithRepos is newTestProductService plus direct
+// access to the raw DB, user repo, and subscription repo — needed by
+// tests that must inspect subscription rows directly (e.g. confirming
+// CheckAccess's auto-subscribe path actually wrote one), create a bare
+// user row without going through the full register/CreateUserAndSubscribe
+// flow, or set fields Create() doesn't accept (e.g. AutoSubscribe, via a
+// raw UPDATE — ProductRepository has no exported DB handle of its own,
+// and no dedicated method for setting this single one-time-only field,
+// matching this plan's own production setup step for the real
+// teslahubs-nav product).
+func newTestProductServiceWithRepos(t *testing.T) (svc *ProductService, db *sql.DB, userRepo *repository.UserRepository, productRepo *repository.ProductRepository, subRepo *repository.SubscriptionRepository) {
+	t.Helper()
+	db = testDB(t)
+	userRepo = repository.NewUserRepository(db)
+	productRepo = repository.NewProductRepository(db)
+	subRepo = repository.NewSubscriptionRepository(db)
 	subprojRepo := repository.NewSubprojectRepository(db)
 	reqRepo := repository.NewProductAdminRequestRepository(db)
 	authSvc := NewAuthService(userRepo, newTestJWTManager())
-	return NewProductService(productRepo, subRepo, subprojRepo, reqRepo, userRepo, authSvc)
+	svc = NewProductService(productRepo, subRepo, subprojRepo, reqRepo, userRepo, authSvc)
+	return svc, db, userRepo, productRepo, subRepo
+}
+
+// newTestUser inserts a minimal real user row (SystemRoleID 3 = "user",
+// per system_roles' seeded rows in Migrate()) — needed wherever a test
+// creates a subscription row directly (user_product_subscriptions.user_id
+// has a foreign key into users) without going through the full
+// register/CreateUserAndSubscribe flow.
+func newTestUser(t *testing.T, userRepo *repository.UserRepository) string {
+	t.Helper()
+	id := uuid.NewString()
+	u := &models.User{
+		ID: id, Name: "Test User", Username: "testuser-" + id, Email: "testuser-" + id + "@example.com",
+		PasswordHash: "unused-in-these-tests", SystemRoleID: 3, Status: models.UserStatusActive,
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if err := userRepo.Create(context.Background(), u); err != nil {
+		t.Fatalf("create test user: %v", err)
+	}
+	return id
 }
 
 func TestProductService_UpdateProfile_RequiresSuperadmin(t *testing.T) {
@@ -351,5 +391,63 @@ func TestProductService_PromoteDirectly_SuperadminOnly(t *testing.T) {
 
 	if _, err := svc.PromoteDirectly(context.Background(), superadmin, p.ID, sub.UserID); err != nil {
 		t.Fatalf("promote directly: %v", err)
+	}
+}
+
+func TestProductService_CheckAccess_AutoSubscribeCreatesFullAccessOnFirstCheck(t *testing.T) {
+	svc, db, userRepo, _, subRepo := newTestProductServiceWithRepos(t)
+
+	p, err := svc.Create(context.Background(), "Auto Product")
+	if err != nil {
+		t.Fatalf("create product: %v", err)
+	}
+	// Create() doesn't accept AutoSubscribe — set it directly, same as
+	// this plan's own production one-time setup step for the real
+	// teslahubs-nav product.
+	if _, err := db.ExecContext(context.Background(), `UPDATE products SET auto_subscribe = true WHERE id = $1`, p.ID); err != nil {
+		t.Fatalf("set auto_subscribe: %v", err)
+	}
+
+	userID := newTestUser(t, userRepo)
+
+	access, err := svc.CheckAccess(context.Background(), userID, p.ID)
+	if err != nil {
+		t.Fatalf("CheckAccess: %v", err)
+	}
+	if access != AccessFull {
+		t.Fatalf("expected full access on first check for an auto_subscribe product, got %q", access)
+	}
+
+	sub, err := subRepo.GetByUserAndProduct(context.Background(), userID, p.ID)
+	if err != nil {
+		t.Fatalf("expected a subscription row to now exist, got error: %v", err)
+	}
+	if !sub.Subscripted {
+		t.Fatalf("expected the auto-created subscription to be Subscripted=true")
+	}
+}
+
+func TestProductService_CheckAccess_NonAutoSubscribeProductStillReturnsDemo(t *testing.T) {
+	svc, _, userRepo, _, subRepo := newTestProductServiceWithRepos(t)
+
+	p, err := svc.Create(context.Background(), "Manual Product")
+	if err != nil {
+		t.Fatalf("create product: %v", err)
+	}
+	// auto_subscribe defaults to false — no extra setup needed, this is
+	// exactly ESound's real product's shape.
+
+	userID := newTestUser(t, userRepo)
+
+	access, err := svc.CheckAccess(context.Background(), userID, p.ID)
+	if err != nil {
+		t.Fatalf("CheckAccess: %v", err)
+	}
+	if access != AccessDemo {
+		t.Fatalf("expected demo access for a non-auto_subscribe product with no subscription, got %q", access)
+	}
+
+	if _, err := subRepo.GetByUserAndProduct(context.Background(), userID, p.ID); err == nil {
+		t.Fatalf("expected NO subscription row to be created for a non-auto_subscribe product, but one exists")
 	}
 }

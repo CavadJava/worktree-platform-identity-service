@@ -174,15 +174,35 @@ func (s *ProductService) RemoveSubproject(ctx context.Context, caller shopassign
 // CheckAccess reports "full" if userID has an active subscription to
 // productID, "demo" otherwise (including when no subscription row exists
 // at all — a user who never subscribed still gets demo access, not an
-// error).
+// error) — UNLESS the product has AutoSubscribe set, in which case a
+// missing subscription is created on the spot (Subscripted: true) rather
+// than left as demo. This only fires when NO subscription row exists yet
+// — an admin who has explicitly unsubscribed a user from an
+// auto_subscribe product (Subscripted: false, a row DOES exist) is never
+// silently re-subscribed by this path; ESound-style products (which keep
+// AutoSubscribe false) are unaffected by this branch entirely, since the
+// auto-create check is gated on p.AutoSubscribe.
 func (s *ProductService) CheckAccess(ctx context.Context, userID, productID string) (string, error) {
-	if _, err := s.productRepo.GetByID(ctx, productID); err != nil {
+	p, err := s.productRepo.GetByID(ctx, productID)
+	if err != nil {
 		return "", err
 	}
 
 	sub, err := s.subRepo.GetByUserAndProduct(ctx, userID, productID)
 	if errors.Is(err, repository.ErrSubscriptionNotFound) {
-		return AccessDemo, nil
+		if !p.AutoSubscribe {
+			return AccessDemo, nil
+		}
+		now := time.Now().UTC()
+		newSub := &models.Subscription{
+			ID: uuid.NewString(), UserID: userID, ProductID: productID,
+			Subscripted: true, Renewed: true,
+			CreatedAt: now, UpdatedAt: now,
+		}
+		if err := s.subRepo.Upsert(ctx, newSub); err != nil {
+			return "", err
+		}
+		return AccessFull, nil
 	}
 	if err != nil {
 		return "", err

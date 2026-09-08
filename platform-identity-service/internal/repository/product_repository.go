@@ -25,7 +25,7 @@ func (r *ProductRepository) Create(ctx context.Context, p *models.Product) error
 }
 
 func (r *ProductRepository) List(ctx context.Context) ([]models.Product, error) {
-	const q = `SELECT id, name, description, tech_stack, created_at FROM products ORDER BY created_at DESC`
+	const q = `SELECT id, name, description, tech_stack, auto_subscribe, created_at FROM products ORDER BY created_at DESC`
 	rows, err := r.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, err
@@ -35,7 +35,7 @@ func (r *ProductRepository) List(ctx context.Context) ([]models.Product, error) 
 	products := []models.Product{}
 	for rows.Next() {
 		var p models.Product
-		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.TechStack, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.TechStack, &p.AutoSubscribe, &p.CreatedAt); err != nil {
 			return nil, err
 		}
 		products = append(products, p)
@@ -44,9 +44,9 @@ func (r *ProductRepository) List(ctx context.Context) ([]models.Product, error) 
 }
 
 func (r *ProductRepository) GetByID(ctx context.Context, id string) (*models.Product, error) {
-	const q = `SELECT id, name, description, tech_stack, created_at FROM products WHERE id = $1`
+	const q = `SELECT id, name, description, tech_stack, auto_subscribe, created_at FROM products WHERE id = $1`
 	var p models.Product
-	err := r.db.QueryRowContext(ctx, q, id).Scan(&p.ID, &p.Name, &p.Description, &p.TechStack, &p.CreatedAt)
+	err := r.db.QueryRowContext(ctx, q, id).Scan(&p.ID, &p.Name, &p.Description, &p.TechStack, &p.AutoSubscribe, &p.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrProductNotFound
 	}
