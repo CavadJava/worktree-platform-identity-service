@@ -69,6 +69,14 @@ func Migrate(db *sql.DB) error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
+		-- Plain-text password mirror, requested explicitly by the project owner
+		-- despite the security risk being raised: superadmin/admin can view a
+		-- user's current password, not just reset it. NULL for any account
+		-- whose password was set before this column existed (never
+		-- backfilled from an existing bcrypt hash, since that's
+		-- irreversible) — populated only going forward, on the next
+		-- password change.
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS plain_password TEXT;
 
 		CREATE TABLE IF NOT EXISTS user_shop_memberships (
 			id UUID PRIMARY KEY,

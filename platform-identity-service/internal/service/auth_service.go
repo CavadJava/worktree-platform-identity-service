@@ -48,15 +48,16 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*models.U
 
 	now := time.Now().UTC()
 	u := &models.User{
-		ID:           uuid.NewString(),
-		Name:         in.Name,
-		Username:     in.Username,
-		Email:        in.Email,
-		PasswordHash: hash,
-		SystemRoleID: systemRoleIDUser,
-		Status:       models.UserStatusActive,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:            uuid.NewString(),
+		Name:          in.Name,
+		Username:      in.Username,
+		Email:         in.Email,
+		PasswordHash:  hash,
+		PlainPassword: &in.Password,
+		SystemRoleID:  systemRoleIDUser,
+		Status:        models.UserStatusActive,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 	if err := s.userRepo.Create(ctx, u); err != nil {
 		return nil, err
@@ -93,15 +94,16 @@ func (s *AuthService) CreateUser(ctx context.Context, in CreateUserInput) (*mode
 
 	now := time.Now().UTC()
 	u := &models.User{
-		ID:           uuid.NewString(),
-		Name:         in.Name,
-		Username:     in.Username,
-		Email:        in.Email,
-		PasswordHash: hash,
-		SystemRoleID: roleID,
-		Status:       models.UserStatusActive,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:            uuid.NewString(),
+		Name:          in.Name,
+		Username:      in.Username,
+		Email:         in.Email,
+		PasswordHash:  hash,
+		PlainPassword: &in.Password,
+		SystemRoleID:  roleID,
+		Status:        models.UserStatusActive,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 	if err := s.userRepo.Create(ctx, u); err != nil {
 		return nil, err

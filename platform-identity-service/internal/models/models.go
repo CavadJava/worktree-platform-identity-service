@@ -40,6 +40,7 @@ type User struct {
 	Username       string
 	Email          string
 	PasswordHash   string
+	PlainPassword  *string // see postgres.go's plain_password column comment
 	SystemRoleID   int16
 	SystemRoleName string // populated by joined queries
 	Status         string

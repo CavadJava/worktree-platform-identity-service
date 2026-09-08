@@ -300,6 +300,44 @@ func (h *UserHandler) ListMyShops(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
+type plainPasswordResponse struct {
+	UserID   string `json:"user_id"`
+	Password string `json:"password"`
+}
+
+// GetPlainPassword godoc
+// @Summary      View a user's stored plain-text password
+// @Description  Admin or superadmin only. Empty string if the password predates this feature.
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "User ID"
+// @Success      200 {object} plainPasswordResponse
+// @Failure      403 {object} map[string]string
+// @Router       /users/{id}/password [get]
+func (h *UserHandler) GetPlainPassword(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	password, err := h.svc.GetPlainPassword(r.Context(), caller, id)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			writeError(w, http.StatusForbidden, "admin or superadmin role required")
+		case errors.Is(err, repository.ErrUserNotFound):
+			writeError(w, http.StatusNotFound, "user not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to get password")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, plainPasswordResponse{UserID: id, Password: password})
+}
+
 func writeUserServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrForbidden):

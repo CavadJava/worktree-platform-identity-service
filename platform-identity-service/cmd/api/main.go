@@ -120,6 +120,7 @@ func main() {
 			r.Post("/users/{id}/status", userHandler.SetStatus)
 			r.Post("/users/{id}/profile", userHandler.UpdateProfile)
 			r.Get("/users/{id}/shops", userHandler.ListMyShops)
+			r.Get("/users/{id}/password", userHandler.GetPlainPassword)
 
 			r.Post("/shops/{id}/members", membershipHandler.AddMember)
 			r.Post("/shops/{id}/members/new", membershipHandler.AddNewMember)

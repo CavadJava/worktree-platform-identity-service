@@ -41,6 +41,26 @@ func (s *UserService) Get(ctx context.Context, caller shopassign.Caller, userID 
 	return s.repo.GetByID(ctx, userID)
 }
 
+// GetPlainPassword lets admin or superadmin view a user's stored plain-text
+// password (see the plain_password column comment in postgres.go for the
+// tradeoff this makes). Returns an empty string, not an error, if the
+// user's password predates this column and was never captured. Not
+// available to the user themselves via this method — this is an
+// admin-oversight action, not a "view my own password" feature.
+func (s *UserService) GetPlainPassword(ctx context.Context, caller shopassign.Caller, userID string) (string, error) {
+	if caller.SystemRole != models.SystemRoleAdmin && caller.SystemRole != models.SystemRoleSuperadmin {
+		return "", ErrForbidden
+	}
+	u, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	if u.PlainPassword == nil {
+		return "", nil
+	}
+	return *u.PlainPassword, nil
+}
+
 func (s *UserService) ListAll(ctx context.Context, caller shopassign.Caller) ([]models.User, error) {
 	if caller.SystemRole != models.SystemRoleSuperadmin {
 		return nil, ErrForbidden
@@ -121,6 +141,7 @@ func (s *UserService) applyProfileUpdate(ctx context.Context, targetUserID strin
 			return nil, err
 		}
 		update.PasswordHash = &hash
+		update.PlainPassword = in.Password
 	}
 	if err := s.repo.Update(ctx, targetUserID, update); err != nil {
 		return nil, err
