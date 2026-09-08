@@ -77,6 +77,10 @@ func Migrate(db *sql.DB) error {
 		-- irreversible) — populated only going forward, on the next
 		-- password change.
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS plain_password TEXT;
+		-- Optional — a product's self-service signup form (e.g. driving-app's
+		-- LoginGate register tab, via ProductService.RegisterAndSubscribe)
+		-- may or may not collect it; NULL for any account that didn't.
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;
 
 		CREATE TABLE IF NOT EXISTS user_shop_memberships (
 			id UUID PRIMARY KEY,

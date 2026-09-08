@@ -105,6 +105,7 @@ func main() {
 		r.Get("/shop-roles", shopRoleHandler.List)
 		r.Get("/products", productHandler.List)
 		r.Get("/products/{id}/subprojects", productHandler.ListSubprojects)
+		r.Post("/products/{id}/register", productHandler.Register)
 
 		r.Post("/auth/register", authHandler.Register)
 		r.Post("/auth/login", authHandler.Login)

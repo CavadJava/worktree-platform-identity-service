@@ -39,6 +39,7 @@ type User struct {
 	Name           string
 	Username       string
 	Email          string
+	Phone          *string // optional — nil for any account that didn't provide one
 	PasswordHash   string
 	PlainPassword  *string // see postgres.go's plain_password column comment
 	SystemRoleID   int16

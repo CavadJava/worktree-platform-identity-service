@@ -26,11 +26,11 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 
 func (r *UserRepository) Create(ctx context.Context, u *models.User) error {
 	const q = `
-		INSERT INTO users (id, name, username, email, password_hash, plain_password, system_role_id, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO users (id, name, username, email, phone, password_hash, plain_password, system_role_id, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 	_, err := r.db.ExecContext(ctx, q,
-		u.ID, u.Name, u.Username, u.Email, u.PasswordHash, u.PlainPassword, u.SystemRoleID, u.Status, u.CreatedAt, u.UpdatedAt,
+		u.ID, u.Name, u.Username, u.Email, u.Phone, u.PasswordHash, u.PlainPassword, u.SystemRoleID, u.Status, u.CreatedAt, u.UpdatedAt,
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -46,14 +46,14 @@ func (r *UserRepository) Create(ctx context.Context, u *models.User) error {
 }
 
 const selectUserWithSystemRole = `
-	SELECT u.id, u.name, u.username, u.email, u.password_hash, u.plain_password, u.system_role_id, sr.name, u.status, u.created_at, u.updated_at
+	SELECT u.id, u.name, u.username, u.email, u.phone, u.password_hash, u.plain_password, u.system_role_id, sr.name, u.status, u.created_at, u.updated_at
 	FROM users u
 	JOIN system_roles sr ON sr.id = u.system_role_id
 `
 
 func (r *UserRepository) scanUser(row *sql.Row) (*models.User, error) {
 	var u models.User
-	err := row.Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.PasswordHash, &u.PlainPassword,
+	err := row.Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.Phone, &u.PasswordHash, &u.PlainPassword,
 		&u.SystemRoleID, &u.SystemRoleName, &u.Status, &u.CreatedAt, &u.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrUserNotFound
@@ -84,7 +84,7 @@ func (r *UserRepository) ListAll(ctx context.Context) ([]models.User, error) {
 	users := []models.User{}
 	for rows.Next() {
 		var u models.User
-		if err := rows.Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.PasswordHash, &u.PlainPassword,
+		if err := rows.Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.Phone, &u.PasswordHash, &u.PlainPassword,
 			&u.SystemRoleID, &u.SystemRoleName, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}

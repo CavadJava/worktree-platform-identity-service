@@ -258,6 +258,40 @@ func (s *ProductService) CreateUserAndSubscribe(ctx context.Context, caller shop
 	return sub, nil
 }
 
+// RegisterAndSubscribe is the PUBLIC, self-service counterpart to
+// CreateUserAndSubscribe above — no caller/canManage check, since this is
+// meant for a product's own public signup form (e.g. driving-app's
+// LoginGate register tab), where the visitor has no admin JWT to call the
+// admin-only version. Always creates a plain 'user'-role account (via
+// AuthService.Register, which has no system_role field to abuse) and
+// immediately marks it subscribed — there is still no payment/approval
+// gate anywhere in this service, so "registered" and "subscribed" are the
+// same event here, by design, not an oversight. Logs the new account in
+// immediately afterward so the caller gets a usable token in one round
+// trip instead of having to submit the login form a second time.
+func (s *ProductService) RegisterAndSubscribe(ctx context.Context, productID string, in RegisterInput) (string, time.Time, error) {
+	if _, err := s.productRepo.GetByID(ctx, productID); err != nil {
+		return "", time.Time{}, err
+	}
+
+	u, err := s.authSvc.Register(ctx, in)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+
+	now := time.Now().UTC()
+	sub := &models.Subscription{
+		ID: uuid.NewString(), UserID: u.ID, ProductID: productID,
+		Subscripted: true, Renewed: false,
+		CreatedAt: now, UpdatedAt: now,
+	}
+	if err := s.subRepo.Upsert(ctx, sub); err != nil {
+		return "", time.Time{}, err
+	}
+
+	return s.authSvc.Login(ctx, LoginInput{Identifier: in.Username, Password: in.Password})
+}
+
 // promoteToAdminAndSubscribe sets subjectUserID's system_role to admin and
 // creates/updates their subscription to productID — the shared end effect
 // of an approved request and a direct promotion.

@@ -429,6 +429,64 @@ func (h *ProductHandler) CreateUserAndSubscribe(w http.ResponseWriter, r *http.R
 	})
 }
 
+type registerAndSubscribeRequest struct {
+	Name     string `json:"name"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
+	Password string `json:"password"`
+}
+
+const minSelfServicePasswordLen = 7
+
+// Register godoc
+// @Summary      Public self-service signup, auto-subscribed to a product
+// @Description  No auth required. Always creates a plain 'user'-role account (phone optional) and immediately marks it subscribed to the given product — there is no payment/approval gate in this service, so "registered" and "subscribed" are the same event here. Returns a token, same shape as /auth/login, so the caller doesn't need a second round trip to log in right after.
+// @Tags         products
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Product ID"
+// @Param        request body registerAndSubscribeRequest true "Signup payload"
+// @Success      201 {object} loginResponse
+// @Failure      400 {object} map[string]string
+// @Failure      404 {object} map[string]string
+// @Failure      409 {object} map[string]string
+// @Router       /products/{id}/register [post]
+func (h *ProductHandler) Register(w http.ResponseWriter, r *http.Request) {
+	var req registerAndSubscribeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Name == "" || req.Username == "" || req.Email == "" || req.Password == "" {
+		writeError(w, http.StatusBadRequest, "name, username, email and password are required")
+		return
+	}
+	if len(req.Password) < minSelfServicePasswordLen {
+		writeError(w, http.StatusBadRequest, "password must be at least 7 characters")
+		return
+	}
+
+	productID := chi.URLParam(r, "id")
+	token, expiresAt, err := h.svc.RegisterAndSubscribe(r.Context(), productID, service.RegisterInput{
+		Name: req.Name, Username: req.Username, Email: req.Email, Phone: req.Phone, Password: req.Password,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrProductNotFound):
+			writeError(w, http.StatusNotFound, "product not found")
+		case errors.Is(err, service.ErrUsernameTaken):
+			writeError(w, http.StatusConflict, "username already registered")
+		case errors.Is(err, service.ErrEmailTaken):
+			writeError(w, http.StatusConflict, "email already registered")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to register")
+		}
+		return
+	}
+	writeJSON(w, http.StatusCreated, loginResponse{Token: token, ExpiresAt: expiresAt.Format(timeFormat)})
+}
+
 // ListMine godoc
 // @Summary      List products the caller may administer
 // @Description  Superadmin sees every product; admin sees only products they hold a subscription to.

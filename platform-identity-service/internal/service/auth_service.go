@@ -34,7 +34,18 @@ type RegisterInput struct {
 	Name     string
 	Username string
 	Email    string
+	Phone    string // optional — empty string stored as NULL, see nilIfEmpty
 	Password string
+}
+
+// nilIfEmpty turns an optional form field ("" when not provided) into the
+// NULL a *string column needs — an empty-string phone would otherwise be
+// stored as a literal empty value instead of "not provided".
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 // Register creates a Teslahubs-wide account. Every registered user starts
@@ -52,6 +63,7 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*models.U
 		Name:          in.Name,
 		Username:      in.Username,
 		Email:         in.Email,
+		Phone:         nilIfEmpty(in.Phone),
 		PasswordHash:  hash,
 		PlainPassword: &in.Password,
 		SystemRoleID:  systemRoleIDUser,
