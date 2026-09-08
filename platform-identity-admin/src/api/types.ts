@@ -65,6 +65,17 @@ export interface BasicUser {
   system_role: string;
 }
 
+export interface ProductCustomer {
+  user_id: string;
+  name: string;
+  username: string;
+  email: string;
+  system_role: string;
+  subscripted: boolean;
+  renewed: boolean;
+  notes: string;
+}
+
 export interface Member {
   id: string;
   user_id: string;

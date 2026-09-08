@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, Form, Input, List, Modal, Select, Space, Switch, Table, Tag, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { BasicUser, Product, ProductAdminRequest, ProductBrowse, Subproject } from '../api/types';
+import type { BasicUser, Product, ProductAdminRequest, ProductBrowse, ProductCustomer, Subproject } from '../api/types';
 import {
   addSubproject,
   createProduct,
@@ -10,6 +10,7 @@ import {
   listAdminRequests,
   listBrowseProducts,
   listMyProducts,
+  listProductCustomers,
   listSubprojects,
   promoteProductAdmin,
   removeSubproject,
@@ -53,6 +54,7 @@ export function ProductsPage() {
   const [requestsModalProduct, setRequestsModalProduct] = useState<Product | null>(null);
   const [promoteModalProduct, setPromoteModalProduct] = useState<Product | null>(null);
   const [promoteUserId, setPromoteUserId] = useState<string | null>(null);
+  const [customersModalProduct, setCustomersModalProduct] = useState<Product | null>(null);
   const [form] = Form.useForm<ProductFormValues>();
   const [profileForm] = Form.useForm<{ description: string; techStack: string }>();
   const [subprojectForm] = Form.useForm<SubprojectFormValues>();
@@ -76,6 +78,13 @@ export function ProductsPage() {
     queryFn: () => listAdminRequests(requestsModalProduct!.id),
     enabled: !!requestsModalProduct,
   });
+
+  const { data: customers, isError: isCustomersError, error: customersError } = useQuery({
+    queryKey: ['product-customers', customersModalProduct?.id],
+    queryFn: () => listProductCustomers(customersModalProduct!.id),
+    enabled: !!customersModalProduct,
+  });
+  useQueryErrorToast(isCustomersError, customersError);
 
   const createMutation = useMutation({
     mutationFn: (values: ProductFormValues) => createProduct(values.name),
@@ -195,6 +204,9 @@ export function ProductsPage() {
           </Button>
           <Button size="small" onClick={() => setPromoteModalProduct(record)}>
             Admin təyin et
+          </Button>
+          <Button size="small" onClick={() => setCustomersModalProduct(record)}>
+            Müştərilər
           </Button>
         </Space>
       ),
@@ -439,6 +451,32 @@ export function ProductsPage() {
           value={promoteUserId ?? undefined}
           onChange={setPromoteUserId}
           options={basicUsers?.map((u: BasicUser) => ({ label: `${u.name} (${u.username}) — ${u.system_role}`, value: u.id }))}
+        />
+      </Modal>
+      <Modal
+        title={customersModalProduct ? `${customersModalProduct.name} — Müştərilər` : ''}
+        open={!!customersModalProduct}
+        onCancel={() => setCustomersModalProduct(null)}
+        footer={null}
+        width={800}
+      >
+        <Table<ProductCustomer>
+          rowKey="user_id"
+          size="small"
+          dataSource={customers ?? []}
+          pagination={false}
+          columns={[
+            { title: 'Ad', dataIndex: 'name' },
+            { title: 'İstifadəçi adı', dataIndex: 'username' },
+            { title: 'Email', dataIndex: 'email' },
+            { title: 'Rol', dataIndex: 'system_role' },
+            {
+              title: 'Subscripted',
+              dataIndex: 'subscripted',
+              render: (v: boolean) => (v ? 'bəli' : 'xeyr'),
+            },
+            { title: 'Qeyd', dataIndex: 'notes' },
+          ]}
         />
       </Modal>
     </>

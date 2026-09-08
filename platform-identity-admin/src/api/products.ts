@@ -1,5 +1,5 @@
 import { platformIdentityApi } from './httpClients';
-import type { Product, Subproject, Subscription, ProductAdminRequest, ProductBrowse } from './types';
+import type { Product, Subproject, Subscription, ProductAdminRequest, ProductBrowse, ProductCustomer } from './types';
 
 export async function listProducts(): Promise<Product[]> {
   const response = await platformIdentityApi.get<Product[]>('/products');
@@ -112,5 +112,10 @@ export async function promoteProductAdmin(productId: string, subjectUserId: stri
   const response = await platformIdentityApi.post<Subscription>(`/products/${productId}/admin`, {
     subject_user_id: subjectUserId,
   });
+  return response.data;
+}
+
+export async function listProductCustomers(productId: string): Promise<ProductCustomer[]> {
+  const response = await platformIdentityApi.get<ProductCustomer[]>(`/products/${productId}/customers`);
   return response.data;
 }
