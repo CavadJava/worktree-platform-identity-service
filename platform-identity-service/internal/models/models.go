@@ -103,3 +103,15 @@ type Subscription struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
+
+// SubscriptionWithUser is a Subscription joined with its user's identity
+// fields, for a product's "customers" list — an admin/superadmin viewing
+// who has access to a product needs the person's name/username/email/role
+// alongside the subscription itself, not just the bare user_id.
+type SubscriptionWithUser struct {
+	Subscription
+	UserName       string
+	UserUsername   string
+	UserEmail      string
+	UserSystemRole string
+}

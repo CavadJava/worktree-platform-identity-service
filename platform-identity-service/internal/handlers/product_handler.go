@@ -667,3 +667,53 @@ func (h *ProductHandler) PromoteAdmin(w http.ResponseWriter, r *http.Request) {
 		UserID: sub.UserID, ProductID: sub.ProductID, Subscripted: sub.Subscripted, Renewed: sub.Renewed, Notes: sub.Notes,
 	})
 }
+
+type customerResponse struct {
+	UserID      string `json:"user_id"`
+	Name        string `json:"name"`
+	Username    string `json:"username"`
+	Email       string `json:"email"`
+	SystemRole  string `json:"system_role"`
+	Subscripted bool   `json:"subscripted"`
+	Renewed     bool   `json:"renewed"`
+	Notes       string `json:"notes"`
+}
+
+// ListCustomers godoc
+// @Summary      List every subscriber of a product
+// @Description  Superadmin, or an admin who manages this product.
+// @Tags         products
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Product ID"
+// @Success      200 {array} customerResponse
+// @Failure      403 {object} map[string]string
+// @Router       /products/{id}/customers [get]
+func (h *ProductHandler) ListCustomers(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	productID := chi.URLParam(r, "id")
+	customers, err := h.svc.ListCustomers(r.Context(), caller, productID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			writeError(w, http.StatusForbidden, "not permitted to manage this product")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to list customers")
+		}
+		return
+	}
+
+	response := make([]customerResponse, len(customers))
+	for i, c := range customers {
+		response[i] = customerResponse{
+			UserID: c.UserID, Name: c.UserName, Username: c.UserUsername, Email: c.UserEmail,
+			SystemRole: c.UserSystemRole, Subscripted: c.Subscripted, Renewed: c.Renewed, Notes: c.Notes,
+		}
+	}
+	writeJSON(w, http.StatusOK, response)
+}

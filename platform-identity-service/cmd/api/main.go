@@ -142,6 +142,7 @@ func main() {
 			r.Get("/products/{id}/admin-requests", productHandler.ListAdminRequests)
 			r.Post("/products/{id}/admin-requests/{requestId}/decide", productHandler.DecideAdminRequest)
 			r.Post("/products/{id}/admin", productHandler.PromoteAdmin)
+			r.Get("/products/{id}/customers", productHandler.ListCustomers)
 		})
 	})
 

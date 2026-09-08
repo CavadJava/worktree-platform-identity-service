@@ -54,6 +54,41 @@ func (r *SubscriptionRepository) ListProductIDsByUser(ctx context.Context, userI
 	return ids, rows.Err()
 }
 
+// ListByProduct returns every subscription row for productID, joined with
+// each subscriber's identity fields — powers a product's "customers" list
+// (any user with a subscription row, regardless of Subscripted's value, and
+// regardless of their system_role — a product-scoped admin is just another
+// subscriber from this table's point of view).
+func (r *SubscriptionRepository) ListByProduct(ctx context.Context, productID string) ([]models.SubscriptionWithUser, error) {
+	const q = `
+		SELECT s.id, s.user_id, s.product_id, s.subscripted, s.renewed, s.notes, s.created_at, s.updated_at,
+			u.name, u.username, u.email, sr.name
+		FROM user_product_subscriptions s
+		JOIN users u ON u.id = s.user_id
+		JOIN system_roles sr ON sr.id = u.system_role_id
+		WHERE s.product_id = $1
+		ORDER BY s.created_at
+	`
+	rows, err := r.db.QueryContext(ctx, q, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	subs := []models.SubscriptionWithUser{}
+	for rows.Next() {
+		var s models.SubscriptionWithUser
+		if err := rows.Scan(
+			&s.ID, &s.UserID, &s.ProductID, &s.Subscripted, &s.Renewed, &s.Notes, &s.CreatedAt, &s.UpdatedAt,
+			&s.UserName, &s.UserUsername, &s.UserEmail, &s.UserSystemRole,
+		); err != nil {
+			return nil, err
+		}
+		subs = append(subs, s)
+	}
+	return subs, rows.Err()
+}
+
 func (r *SubscriptionRepository) GetByUserAndProduct(ctx context.Context, userID, productID string) (*models.Subscription, error) {
 	const q = `
 		SELECT id, user_id, product_id, subscripted, renewed, notes, created_at, updated_at

@@ -69,6 +69,7 @@ func testProductRouter(t *testing.T) (chi.Router, *sql.DB, *auth.JWTManager) {
 		r.Get("/api/v1/products/{id}/admin-requests", productHandler.ListAdminRequests)
 		r.Post("/api/v1/products/{id}/admin-requests/{requestId}/decide", productHandler.DecideAdminRequest)
 		r.Post("/api/v1/products/{id}/admin", productHandler.PromoteAdmin)
+		r.Get("/api/v1/products/{id}/customers", productHandler.ListCustomers)
 	})
 
 	t.Cleanup(func() { db.Close() })
@@ -299,5 +300,62 @@ func TestProductHandler_ScopedListAndAdminRequestFlow(t *testing.T) {
 	rec = doJSON(t, r, http.MethodPost, "/api/v1/products/"+p2.ID+"/admin", superToken, map[string]string{"subject_user_id": adminUserID})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("promote directly: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestProductHandler_ListCustomers(t *testing.T) {
+	r, db, jwtManager := testProductRouter(t)
+	superToken := createTestSuperadmin(t, db, jwtManager)
+
+	rec := doJSON(t, r, http.MethodPost, "/api/v1/products", superToken, map[string]string{"name": "Teslahubs"})
+	var pEnv struct {
+		Data productResponse `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&pEnv)
+	product := pEnv.Data
+
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/products", superToken, map[string]string{"name": "ESound"})
+	var otherEnv struct {
+		Data productResponse `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&otherEnv)
+	other := otherEnv.Data
+
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/products/"+product.ID+"/users", superToken, map[string]string{
+		"name": "Owner Admin", "username": "owneradmin-" + product.ID, "email": "owneradmin-" + product.ID + "@example.com",
+		"password": "password123", "system_role": "admin",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create admin: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	adminToken := loginAs(t, r, "owneradmin-"+product.ID, "password123")
+
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/products/"+product.ID+"/users", superToken, map[string]string{
+		"name": "Plain Customer", "username": "plaincust-" + product.ID, "email": "plaincust-" + product.ID + "@example.com", "password": "password123",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create customer: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, r, http.MethodGet, "/api/v1/products/"+product.ID+"/customers", adminToken, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list customers as owning admin: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var listEnv struct {
+		Data []customerResponse `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&listEnv)
+	if len(listEnv.Data) != 2 {
+		t.Fatalf("expected 2 customers, got %d: %+v", len(listEnv.Data), listEnv.Data)
+	}
+
+	rec = doJSON(t, r, http.MethodGet, "/api/v1/products/"+other.ID+"/customers", adminToken, nil)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("list customers of unmanaged product: expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, r, http.MethodGet, "/api/v1/products/"+product.ID+"/customers", superToken, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list customers as superadmin: expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

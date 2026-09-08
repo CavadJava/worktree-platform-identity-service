@@ -111,6 +111,16 @@ func (s *ProductService) ListForCaller(ctx context.Context, caller shopassign.Ca
 	return filtered, nil
 }
 
+// ListCustomers returns every subscriber of productID — gated the same way
+// as the other product-management methods: superadmin may view any
+// product's customers, an admin only a product they manage.
+func (s *ProductService) ListCustomers(ctx context.Context, caller shopassign.Caller, productID string) ([]models.SubscriptionWithUser, error) {
+	if err := s.canManage(ctx, caller, productID); err != nil {
+		return nil, err
+	}
+	return s.subRepo.ListByProduct(ctx, productID)
+}
+
 // UpdateProfile lets a superadmin or an admin who holds a subscription to the product set a product's description and tech
 // stack. Both fields are always submitted together by the admin panel form.
 func (s *ProductService) UpdateProfile(ctx context.Context, caller shopassign.Caller, productID, description, techStack string) (*models.Product, error) {

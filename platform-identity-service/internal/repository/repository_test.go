@@ -441,6 +441,61 @@ func TestSubscriptionRepository_UpsertAndGet(t *testing.T) {
 	}
 }
 
+func TestSubscriptionRepository_ListByProduct(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	userRepo := NewUserRepository(db)
+	productRepo := NewProductRepository(db)
+	subRepo := NewSubscriptionRepository(db)
+
+	p := &models.Product{ID: uuid.NewString(), Name: "Customers Product " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	if err := productRepo.Create(context.Background(), p); err != nil {
+		t.Fatalf("create product failed: %v", err)
+	}
+
+	customer := createTestUser(t, userRepo, 3)
+	admin := createTestUser(t, userRepo, 2)
+
+	now := time.Now().UTC()
+	for _, u := range []*models.User{customer, admin} {
+		sub := &models.Subscription{ID: uuid.NewString(), UserID: u.ID, ProductID: p.ID, Subscripted: true, Notes: "note for " + u.Username, CreatedAt: now, UpdatedAt: now}
+		if err := subRepo.Upsert(context.Background(), sub); err != nil {
+			t.Fatalf("upsert for %s failed: %v", u.Username, err)
+		}
+	}
+
+	list, err := subRepo.ListByProduct(context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("ListByProduct failed: %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("expected 2 subscribers, got %d", len(list))
+	}
+
+	byUsername := map[string]models.SubscriptionWithUser{}
+	for _, s := range list {
+		byUsername[s.UserUsername] = s
+	}
+	if got, ok := byUsername[customer.Username]; !ok || got.UserSystemRole != "user" {
+		t.Errorf("expected customer with role 'user', got %+v (found=%v)", got, ok)
+	}
+	if got, ok := byUsername[admin.Username]; !ok || got.UserSystemRole != "admin" {
+		t.Errorf("expected admin with role 'admin', got %+v (found=%v)", got, ok)
+	}
+
+	other := &models.Product{ID: uuid.NewString(), Name: "Other Product " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	if err := productRepo.Create(context.Background(), other); err != nil {
+		t.Fatalf("create other product failed: %v", err)
+	}
+	list, err = subRepo.ListByProduct(context.Background(), other.ID)
+	if err != nil {
+		t.Fatalf("ListByProduct for unrelated product failed: %v", err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("expected 0 subscribers for unrelated product, got %d", len(list))
+	}
+}
+
 func TestProductAdminRequestRepository_CreateListDecide(t *testing.T) {
 	db := testDB(t)
 	defer db.Close()

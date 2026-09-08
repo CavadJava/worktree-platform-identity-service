@@ -174,6 +174,71 @@ func TestProductService_AdminWithSubscriptionCanManageTheirProduct(t *testing.T)
 	}
 }
 
+func TestProductService_ListCustomers(t *testing.T) {
+	svc := newTestProductService(t)
+	p, err := svc.Create(context.Background(), "Teslahubs")
+	if err != nil {
+		t.Fatalf("create product: %v", err)
+	}
+	other, err := svc.Create(context.Background(), "ESound")
+	if err != nil {
+		t.Fatalf("create other product: %v", err)
+	}
+	superadmin := shopassign.Caller{SystemRole: models.SystemRoleSuperadmin}
+
+	adminUser, err := svc.authSvc.CreateUser(context.Background(), CreateUserInput{
+		Name: "Owner Admin", Username: "owner-" + p.ID, Email: "owner-" + p.ID + "@example.com",
+		Password: "password123", SystemRole: models.SystemRoleAdmin,
+	})
+	if err != nil {
+		t.Fatalf("create admin user: %v", err)
+	}
+	admin := shopassign.Caller{UserID: adminUser.ID, SystemRole: models.SystemRoleAdmin}
+
+	// Not subscribed yet — forbidden.
+	if _, err := svc.ListCustomers(context.Background(), admin, p.ID); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden before subscription exists, got %v", err)
+	}
+
+	if _, err := svc.SetSubscription(context.Background(), superadmin, admin.UserID, p.ID, true, false, ""); err != nil {
+		t.Fatalf("subscribe admin: %v", err)
+	}
+
+	customerSub, err := svc.CreateUserAndSubscribe(context.Background(), superadmin, p.ID, CreateUserInput{
+		Name: "Plain Customer", Username: "customer-" + p.ID, Email: "customer-" + p.ID + "@example.com", Password: "password123",
+	}, models.SystemRoleUser)
+	if err != nil {
+		t.Fatalf("create customer: %v", err)
+	}
+
+	list, err := svc.ListCustomers(context.Background(), admin, p.ID)
+	if err != nil {
+		t.Fatalf("expected admin with subscription to list customers, got %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("expected 2 customers (admin + plain customer), got %d", len(list))
+	}
+	foundCustomer := false
+	for _, c := range list {
+		if c.UserID == customerSub.UserID {
+			foundCustomer = true
+		}
+	}
+	if !foundCustomer {
+		t.Fatalf("expected created customer in list, got %+v", list)
+	}
+
+	// Admin cannot list a product they don't manage.
+	if _, err := svc.ListCustomers(context.Background(), admin, other.ID); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden for unmanaged product, got %v", err)
+	}
+
+	// Superadmin can list any product's customers, no subscription needed.
+	if _, err := svc.ListCustomers(context.Background(), superadmin, p.ID); err != nil {
+		t.Fatalf("expected superadmin to list customers, got %v", err)
+	}
+}
+
 func TestProductService_RequestApprovePromoteFlow(t *testing.T) {
 	svc := newTestProductService(t)
 	p, err := svc.Create(context.Background(), "Teslahubs")
