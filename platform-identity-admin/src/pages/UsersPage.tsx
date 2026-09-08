@@ -3,7 +3,7 @@ import { Button, Form, Input, Modal, Select, Space, Table, Tag, message } from '
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import type { User } from '../api/types';
-import { createUser, listAllUsers, setStatus, setSystemRole } from '../api/users';
+import { createUser, getPlainPassword, listAllUsers, setStatus, setSystemRole } from '../api/users';
 import { useQueryErrorToast } from '../hooks/useQueryErrorToast';
 
 interface CreateUserFormValues {
@@ -18,6 +18,8 @@ export function UsersPage() {
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [form] = Form.useForm<CreateUserFormValues>();
+  const [passwordModalUser, setPasswordModalUser] = useState<User | null>(null);
+  const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
 
   const { data: users, isLoading, isError, error } = useQuery({ queryKey: ['all-users'], queryFn: () => listAllUsers() });
   useQueryErrorToast(isError, error);
@@ -52,6 +54,15 @@ export function UsersPage() {
       invalidate();
     },
     onError: (err) => message.error(err instanceof Error ? err.message : 'Xəta baş verdi'),
+  });
+
+  const revealPasswordMutation = useMutation({
+    mutationFn: (userId: string) => getPlainPassword(userId),
+    onSuccess: (data) => setRevealedPassword(data.password),
+    onError: (err) => {
+      message.error(err instanceof Error ? err.message : 'Xəta baş verdi');
+      setPasswordModalUser(null);
+    },
   });
 
   const columns = [
@@ -115,6 +126,16 @@ export function UsersPage() {
           >
             {record.status === 'ACTIVE' ? 'Deaktiv et' : 'Aktiv et'}
           </Button>
+          <Button
+            size="small"
+            onClick={() => {
+              setPasswordModalUser(record);
+              setRevealedPassword(null);
+              revealPasswordMutation.mutate(record.id);
+            }}
+          >
+            Şifrə
+          </Button>
         </Space>
       ),
     },
@@ -156,6 +177,26 @@ export function UsersPage() {
             />
           </Form.Item>
         </Form>
+      </Modal>
+      <Modal
+        title={passwordModalUser ? `${passwordModalUser.name} — Şifrə` : ''}
+        open={!!passwordModalUser}
+        onCancel={() => setPasswordModalUser(null)}
+        footer={null}
+      >
+        {revealPasswordMutation.isPending ? (
+          <p>Yüklənir...</p>
+        ) : revealedPassword === '' ? (
+          <p style={{ color: '#999' }}>
+            Bu istifadəçinin şifrəsi bu funksiya əlavə olunmazdan əvvəl təyin edilib, saxlanılmayıb.
+          </p>
+        ) : (
+          <Input.Password
+            value={revealedPassword ?? ''}
+            readOnly
+            visibilityToggle
+          />
+        )}
       </Modal>
     </>
   );

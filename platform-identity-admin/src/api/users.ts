@@ -43,6 +43,11 @@ export async function setStatus(userId: string, status: string): Promise<User> {
   return response.data;
 }
 
+export async function getPlainPassword(userId: string): Promise<{ user_id: string; password: string }> {
+  const response = await platformIdentityApi.get<{ user_id: string; password: string }>(`/users/${userId}/password`);
+  return response.data;
+}
+
 export interface ProfileUpdateInput {
   name?: string;
   email?: string;
