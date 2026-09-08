@@ -150,7 +150,7 @@ type subscriptionResponse struct {
 
 // SetSubscription godoc
 // @Summary      Manually set a user's subscription to a product
-// @Description  Superadmin only. No payment gateway integration.
+// @Description  Superadmin, or an admin who manages this product. No payment gateway integration.
 // @Tags         products
 // @Accept       json
 // @Produce      json
@@ -200,7 +200,7 @@ type updateProductProfileRequest struct {
 
 // UpdateProfile godoc
 // @Summary      Set a product's description and tech stack
-// @Description  Superadmin only.
+// @Description  Superadmin, or an admin who manages this product.
 // @Tags         products
 // @Accept       json
 // @Produce      json
@@ -254,7 +254,7 @@ type subprojectResponse struct {
 
 // AddSubproject godoc
 // @Summary      Add a named subproject/module to a product
-// @Description  Superadmin only.
+// @Description  Superadmin, or an admin who manages this product.
 // @Tags         products
 // @Accept       json
 // @Produce      json
@@ -327,7 +327,7 @@ func (h *ProductHandler) ListSubprojects(w http.ResponseWriter, r *http.Request)
 
 // RemoveSubproject godoc
 // @Summary      Remove a subproject
-// @Description  Superadmin only.
+// @Description  Superadmin, or an admin who manages this product.
 // @Tags         products
 // @Security     BearerAuth
 // @Param        id path string true "Product ID"
@@ -368,8 +368,9 @@ type createProductUserRequest struct {
 
 // CreateUserAndSubscribe godoc
 // @Summary      Create a brand-new user and subscribe it to a product
-// @Description  Superadmin only. Creates a system-role 'user' account and
-// @Description  immediately marks it subscribed to the product.
+// @Description  Superadmin, or an admin who manages this product. Creates
+// @Description  an account with the given system role ('user' or 'admin')
+// @Description  and immediately marks it subscribed to the product.
 // @Tags         products
 // @Accept       json
 // @Produce      json
