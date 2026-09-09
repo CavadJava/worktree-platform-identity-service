@@ -6,8 +6,8 @@ export async function listShops(): Promise<Shop[]> {
   return response.data;
 }
 
-export async function createShop(name: string): Promise<Shop> {
-  const response = await platformIdentityApi.post<Shop>('/shops', { name });
+export async function createShop(name: string, shopType: string): Promise<Shop> {
+  const response = await platformIdentityApi.post<Shop>('/shops', { name, shop_type: shopType });
   return response.data;
 }
 

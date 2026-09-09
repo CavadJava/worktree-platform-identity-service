@@ -42,7 +42,7 @@ func TestShopRepository_CreateAndGet(t *testing.T) {
 	defer db.Close()
 	repo := NewShopRepository(db)
 
-	s := &models.Shop{ID: uuid.NewString(), Name: "Test Shop " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	s := &models.Shop{ID: uuid.NewString(), Name: "Test Shop " + uuid.NewString(), ShopType: models.ShopTypeLocal, CreatedAt: time.Now().UTC()}
 	if err := repo.Create(context.Background(), s); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -233,7 +233,7 @@ func TestShopMembershipRepository_CreateListGetSetRole(t *testing.T) {
 	userRepo := NewUserRepository(db)
 	membershipRepo := NewShopMembershipRepository(db)
 
-	shop := &models.Shop{ID: uuid.NewString(), Name: "Membership Shop " + uuid.NewString(), CreatedAt: time.Now().UTC()}
+	shop := &models.Shop{ID: uuid.NewString(), Name: "Membership Shop " + uuid.NewString(), ShopType: models.ShopTypeLocal, CreatedAt: time.Now().UTC()}
 	if err := shopRepo.Create(context.Background(), shop); err != nil {
 		t.Fatalf("create shop failed: %v", err)
 	}

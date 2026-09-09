@@ -57,6 +57,10 @@ func Migrate(db *sql.DB) error {
 			name TEXT NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
+		-- 'foreign' or 'local' — chosen at creation time, required going
+		-- forward; existing shops default to 'local' since that was the
+		-- only kind before this distinction existed.
+		ALTER TABLE shops ADD COLUMN IF NOT EXISTS shop_type TEXT NOT NULL DEFAULT 'local';
 
 		CREATE TABLE IF NOT EXISTS users (
 			id UUID PRIMARY KEY,

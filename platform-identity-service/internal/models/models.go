@@ -18,9 +18,15 @@ const (
 	UserStatusInActive = "IN_ACTIVE"
 )
 
+const (
+	ShopTypeForeign = "foreign"
+	ShopTypeLocal   = "local"
+)
+
 type Shop struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
+	ShopType  string    `json:"shop_type"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

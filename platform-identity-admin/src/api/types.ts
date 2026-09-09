@@ -6,6 +6,7 @@ export interface ApiError {
 export interface Shop {
   id: string;
   name: string;
+  shop_type: string;
   created_at: string;
 }
 

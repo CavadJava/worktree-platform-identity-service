@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,7 +11,10 @@ import (
 	"platform-identity-service/internal/repository"
 )
 
-var ErrShopNotFound = repository.ErrShopNotFound
+var (
+	ErrShopNotFound     = repository.ErrShopNotFound
+	ErrInvalidShopType  = errors.New("invalid shop type: must be 'foreign' or 'local'")
+)
 
 type ShopService struct {
 	repo *repository.ShopRepository
@@ -20,10 +24,14 @@ func NewShopService(repo *repository.ShopRepository) *ShopService {
 	return &ShopService{repo: repo}
 }
 
-func (s *ShopService) Create(ctx context.Context, name string) (*models.Shop, error) {
+func (s *ShopService) Create(ctx context.Context, name, shopType string) (*models.Shop, error) {
+	if shopType != models.ShopTypeForeign && shopType != models.ShopTypeLocal {
+		return nil, ErrInvalidShopType
+	}
 	shop := &models.Shop{
 		ID:        uuid.NewString(),
 		Name:      name,
+		ShopType:  shopType,
 		CreatedAt: time.Now().UTC(),
 	}
 	if err := s.repo.Create(ctx, shop); err != nil {

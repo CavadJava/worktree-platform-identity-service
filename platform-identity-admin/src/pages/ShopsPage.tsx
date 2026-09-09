@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Form, Input, Modal, Table, message } from 'antd';
+import { Button, Form, Input, Modal, Select, Table, Tag, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { Shop } from '../api/types';
@@ -8,6 +8,7 @@ import { useQueryErrorToast } from '../hooks/useQueryErrorToast';
 
 interface ShopFormValues {
   name: string;
+  shop_type: string;
 }
 
 export function ShopsPage() {
@@ -20,7 +21,7 @@ export function ShopsPage() {
   useQueryErrorToast(isError, error);
 
   const createMutation = useMutation({
-    mutationFn: (values: ShopFormValues) => createShop(values.name),
+    mutationFn: (values: ShopFormValues) => createShop(values.name, values.shop_type),
     onSuccess: () => {
       message.success('Shop yaradıldı');
       setModalOpen(false);
@@ -33,6 +34,12 @@ export function ShopsPage() {
   const columns = [
     { title: 'Ad', dataIndex: 'name' },
     { title: 'ID', dataIndex: 'id' },
+    {
+      title: 'Növ',
+      dataIndex: 'shop_type',
+      render: (shopType: string) =>
+        shopType === 'foreign' ? <Tag color="blue">Xarici</Tag> : <Tag color="green">Yerli</Tag>,
+    },
     { title: 'Yaradılma tarixi', dataIndex: 'created_at' },
     {
       title: 'Əməliyyat',
@@ -60,6 +67,15 @@ export function ShopsPage() {
         <Form form={form} layout="vertical" onFinish={(values) => createMutation.mutate(values)}>
           <Form.Item name="name" label="Ad" rules={[{ required: true }]}>
             <Input />
+          </Form.Item>
+          <Form.Item name="shop_type" label="Növ" rules={[{ required: true }]}>
+            <Select
+              placeholder="Növ seç"
+              options={[
+                { label: 'Xarici', value: 'foreign' },
+                { label: 'Yerli', value: 'local' },
+              ]}
+            />
           </Form.Item>
         </Form>
       </Modal>

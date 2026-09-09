@@ -19,13 +19,13 @@ func NewShopRepository(db *sql.DB) *ShopRepository {
 }
 
 func (r *ShopRepository) Create(ctx context.Context, s *models.Shop) error {
-	const q = `INSERT INTO shops (id, name, created_at) VALUES ($1, $2, $3)`
-	_, err := r.db.ExecContext(ctx, q, s.ID, s.Name, s.CreatedAt)
+	const q = `INSERT INTO shops (id, name, shop_type, created_at) VALUES ($1, $2, $3, $4)`
+	_, err := r.db.ExecContext(ctx, q, s.ID, s.Name, s.ShopType, s.CreatedAt)
 	return err
 }
 
 func (r *ShopRepository) List(ctx context.Context) ([]models.Shop, error) {
-	const q = `SELECT id, name, created_at FROM shops ORDER BY created_at DESC`
+	const q = `SELECT id, name, shop_type, created_at FROM shops ORDER BY created_at DESC`
 	rows, err := r.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, err
@@ -35,7 +35,7 @@ func (r *ShopRepository) List(ctx context.Context) ([]models.Shop, error) {
 	shops := []models.Shop{}
 	for rows.Next() {
 		var s models.Shop
-		if err := rows.Scan(&s.ID, &s.Name, &s.CreatedAt); err != nil {
+		if err := rows.Scan(&s.ID, &s.Name, &s.ShopType, &s.CreatedAt); err != nil {
 			return nil, err
 		}
 		shops = append(shops, s)
@@ -44,9 +44,9 @@ func (r *ShopRepository) List(ctx context.Context) ([]models.Shop, error) {
 }
 
 func (r *ShopRepository) GetByID(ctx context.Context, id string) (*models.Shop, error) {
-	const q = `SELECT id, name, created_at FROM shops WHERE id = $1`
+	const q = `SELECT id, name, shop_type, created_at FROM shops WHERE id = $1`
 	var s models.Shop
-	err := r.db.QueryRowContext(ctx, q, id).Scan(&s.ID, &s.Name, &s.CreatedAt)
+	err := r.db.QueryRowContext(ctx, q, id).Scan(&s.ID, &s.Name, &s.ShopType, &s.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrShopNotFound
 	}

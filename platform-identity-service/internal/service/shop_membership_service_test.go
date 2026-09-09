@@ -28,7 +28,7 @@ func newTestShopMembershipService(t *testing.T) (*ShopMembershipService, *AuthSe
 func TestShopMembershipService_AddMember_BySuperadmin(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 
-	shop, err := shopSvc.Create(context.Background(), "Superadmin Add Test "+uuid.NewString())
+	shop, err := shopSvc.Create(context.Background(), "Superadmin Add Test "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shop failed: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestShopMembershipService_AddMember_BySuperadmin(t *testing.T) {
 func TestShopMembershipService_AddMember_ByShopAdmin(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 
-	shop, err := shopSvc.Create(context.Background(), "ShopAdmin Add Test "+uuid.NewString())
+	shop, err := shopSvc.Create(context.Background(), "ShopAdmin Add Test "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shop failed: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestShopMembershipService_AddMember_ByShopAdmin(t *testing.T) {
 func TestShopMembershipService_AddNewMember_ByShopAdmin(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 
-	shop, err := shopSvc.Create(context.Background(), "ShopAdmin AddNew Test "+uuid.NewString())
+	shop, err := shopSvc.Create(context.Background(), "ShopAdmin AddNew Test "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shop failed: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestShopMembershipService_AddNewMember_ByShopAdmin(t *testing.T) {
 func TestShopMembershipService_AddNewMember_ForbiddenForNonMember(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 
-	shop, err := shopSvc.Create(context.Background(), "AddNewMember Forbidden Test "+uuid.NewString())
+	shop, err := shopSvc.Create(context.Background(), "AddNewMember Forbidden Test "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shop failed: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestShopMembershipService_AddNewMember_ForbiddenForNonMember(t *testing.T) 
 func TestShopMembershipService_AddMember_ForbiddenForNonMember(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 
-	shop, err := shopSvc.Create(context.Background(), "Forbidden Add Test "+uuid.NewString())
+	shop, err := shopSvc.Create(context.Background(), "Forbidden Add Test "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shop failed: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestShopMembershipService_AddMember_ForbiddenForNonMember(t *testing.T) {
 func TestShopMembershipService_ListMembers(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 
-	shop, err := shopSvc.Create(context.Background(), "ListMembers Test "+uuid.NewString())
+	shop, err := shopSvc.Create(context.Background(), "ListMembers Test "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shop failed: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestShopMembershipService_ListMembers(t *testing.T) {
 func TestShopMembershipService_ListMembers_PlainShopUserCanView(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 
-	shop, err := shopSvc.Create(context.Background(), "ListMembers ShopUser Test "+uuid.NewString())
+	shop, err := shopSvc.Create(context.Background(), "ListMembers ShopUser Test "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shop failed: %v", err)
 	}
@@ -231,7 +231,7 @@ func TestShopMembershipService_ListMembers_PlainShopUserCanView(t *testing.T) {
 func TestShopMembershipService_SetMemberRole(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 
-	shop, err := shopSvc.Create(context.Background(), "SetMemberRole Test "+uuid.NewString())
+	shop, err := shopSvc.Create(context.Background(), "SetMemberRole Test "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shop failed: %v", err)
 	}
@@ -259,7 +259,7 @@ func TestShopMembershipService_SetMemberRole(t *testing.T) {
 func TestShopMembershipService_SetMemberRole_ShopAdminCannotDemoteSelf(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 
-	shop, err := shopSvc.Create(context.Background(), "SelfDemote Test "+uuid.NewString())
+	shop, err := shopSvc.Create(context.Background(), "SelfDemote Test "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shop failed: %v", err)
 	}
@@ -295,7 +295,7 @@ func TestShopMembershipService_SetMemberRole_ShopAdminCannotDemoteSelf(t *testin
 func TestShopMembershipService_RemoveMember(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 
-	shop, err := shopSvc.Create(context.Background(), "RemoveMember Test "+uuid.NewString())
+	shop, err := shopSvc.Create(context.Background(), "RemoveMember Test "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shop failed: %v", err)
 	}
@@ -327,7 +327,7 @@ func TestShopMembershipService_RemoveMember(t *testing.T) {
 func TestShopMembershipService_RemoveMember_ShopAdminCannotRemoveSelf(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 
-	shop, err := shopSvc.Create(context.Background(), "SelfRemove Test "+uuid.NewString())
+	shop, err := shopSvc.Create(context.Background(), "SelfRemove Test "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shop failed: %v", err)
 	}
@@ -352,7 +352,7 @@ func TestShopMembershipService_RemoveMember_ShopAdminCannotRemoveSelf(t *testing
 func TestShopMembershipService_UpdateMemberProfile(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 
-	shop, err := shopSvc.Create(context.Background(), "UpdateProfile Test "+uuid.NewString())
+	shop, err := shopSvc.Create(context.Background(), "UpdateProfile Test "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shop failed: %v", err)
 	}
@@ -396,11 +396,11 @@ func TestShopMembershipService_UpdateMemberProfile(t *testing.T) {
 func TestShopMembershipService_ListMyShops(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 
-	shopA, err := shopSvc.Create(context.Background(), "MyShops A "+uuid.NewString())
+	shopA, err := shopSvc.Create(context.Background(), "MyShops A "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shopA failed: %v", err)
 	}
-	shopB, err := shopSvc.Create(context.Background(), "MyShops B "+uuid.NewString())
+	shopB, err := shopSvc.Create(context.Background(), "MyShops B "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shopB failed: %v", err)
 	}
@@ -431,7 +431,7 @@ func TestShopMembershipService_ListMyShops(t *testing.T) {
 func TestShopMembershipService_ListAllGroupedByUser(t *testing.T) {
 	membershipSvc, authSvc, shopSvc := newTestShopMembershipService(t)
 
-	shop, err := shopSvc.Create(context.Background(), "GroupedByUser Test "+uuid.NewString())
+	shop, err := shopSvc.Create(context.Background(), "GroupedByUser Test "+uuid.NewString(), models.ShopTypeLocal)
 	if err != nil {
 		t.Fatalf("create shop failed: %v", err)
 	}
