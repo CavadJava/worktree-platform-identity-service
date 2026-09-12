@@ -1,0 +1,19 @@
+html,
+body,
+#root {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* AntD Table's own horizontal scroller keeps the page itself from
+   overflowing sideways on a phone screen — every table in this app
+   gets this for free without touching each page's Table props. */
+.ant-table-wrapper {
+  overflow-x: auto;
+}
+
+@media (max-width: 768px) {
+  .ant-layout-content {
+    overflow-x: auto;
+  }
+}
