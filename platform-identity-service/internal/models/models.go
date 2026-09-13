@@ -24,10 +24,14 @@ const (
 )
 
 type Shop struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	ShopType  string    `json:"shop_type"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	ShopType     string    `json:"shop_type"`
+	ContactEmail string    `json:"contact_email"`
+	ContactPhone string    `json:"contact_phone"`
+	Address      string    `json:"address"`
+	WorkHours    string    `json:"work_hours"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type SystemRole struct {

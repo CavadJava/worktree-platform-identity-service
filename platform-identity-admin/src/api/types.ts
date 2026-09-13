@@ -7,6 +7,10 @@ export interface Shop {
   id: string;
   name: string;
   shop_type: string;
+  contact_email: string;
+  contact_phone: string;
+  address: string;
+  work_hours: string;
   created_at: string;
 }
 

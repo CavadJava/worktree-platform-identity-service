@@ -61,6 +61,13 @@ func Migrate(db *sql.DB) error {
 		-- forward; existing shops default to 'local' since that was the
 		-- only kind before this distinction existed.
 		ALTER TABLE shops ADD COLUMN IF NOT EXISTS shop_type TEXT NOT NULL DEFAULT 'local';
+		-- Optional contact/profile details, editable after creation —
+		-- empty string default so every existing shop keeps working with
+		-- no backfill required.
+		ALTER TABLE shops ADD COLUMN IF NOT EXISTS contact_email TEXT NOT NULL DEFAULT '';
+		ALTER TABLE shops ADD COLUMN IF NOT EXISTS contact_phone TEXT NOT NULL DEFAULT '';
+		ALTER TABLE shops ADD COLUMN IF NOT EXISTS address TEXT NOT NULL DEFAULT '';
+		ALTER TABLE shops ADD COLUMN IF NOT EXISTS work_hours TEXT NOT NULL DEFAULT '';
 
 		CREATE TABLE IF NOT EXISTS users (
 			id UUID PRIMARY KEY,

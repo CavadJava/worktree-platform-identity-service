@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"platform-identity-service/internal/middleware"
 	"platform-identity-service/internal/models"
 	"platform-identity-service/internal/repository"
 	"platform-identity-service/internal/service"
@@ -26,14 +27,22 @@ type createShopRequest struct {
 }
 
 type shopResponse struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	ShopType  string `json:"shop_type"`
-	CreatedAt string `json:"created_at"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	ShopType     string `json:"shop_type"`
+	ContactEmail string `json:"contact_email"`
+	ContactPhone string `json:"contact_phone"`
+	Address      string `json:"address"`
+	WorkHours    string `json:"work_hours"`
+	CreatedAt    string `json:"created_at"`
 }
 
 func toShopResponse(s *models.Shop) shopResponse {
-	return shopResponse{ID: s.ID, Name: s.Name, ShopType: s.ShopType, CreatedAt: s.CreatedAt.Format(timeFormat)}
+	return shopResponse{
+		ID: s.ID, Name: s.Name, ShopType: s.ShopType,
+		ContactEmail: s.ContactEmail, ContactPhone: s.ContactPhone, Address: s.Address, WorkHours: s.WorkHours,
+		CreatedAt: s.CreatedAt.Format(timeFormat),
+	}
 }
 
 // Create godoc
@@ -108,6 +117,56 @@ func (h *ShopHandler) Get(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "shop not found")
 		default:
 			writeError(w, http.StatusInternalServerError, "failed to get shop")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, toShopResponse(s))
+}
+
+type updateShopProfileRequest struct {
+	ContactEmail string `json:"contact_email"`
+	ContactPhone string `json:"contact_phone"`
+	Address      string `json:"address"`
+	WorkHours    string `json:"work_hours"`
+}
+
+// UpdateProfile godoc
+// @Summary      Set a shop's contact details
+// @Description  Superadmin only.
+// @Tags         shops
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Shop ID"
+// @Param        request body updateShopProfileRequest true "Profile payload"
+// @Success      200 {object} shopResponse
+// @Failure      403 {object} map[string]string
+// @Router       /shops/{id}/profile [post]
+func (h *ShopHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	caller, ok := middleware.CallerFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req updateShopProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	s, err := h.svc.UpdateProfile(r.Context(), caller, id, repository.ShopProfileUpdate{
+		ContactEmail: req.ContactEmail, ContactPhone: req.ContactPhone, Address: req.Address, WorkHours: req.WorkHours,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			writeError(w, http.StatusForbidden, "superadmin role required")
+		case errors.Is(err, repository.ErrShopNotFound):
+			writeError(w, http.StatusNotFound, "shop not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to update shop profile")
 		}
 		return
 	}

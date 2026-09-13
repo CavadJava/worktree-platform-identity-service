@@ -9,6 +9,7 @@ import (
 
 	"platform-identity-service/internal/models"
 	"platform-identity-service/internal/repository"
+	"platform-identity-service/internal/service/shopassign"
 )
 
 var (
@@ -46,4 +47,18 @@ func (s *ShopService) List(ctx context.Context) ([]models.Shop, error) {
 
 func (s *ShopService) Get(ctx context.Context, id string) (*models.Shop, error) {
 	return s.repo.GetByID(ctx, id)
+}
+
+// UpdateProfile lets a superadmin set a shop's contact details (email,
+// phone, address, work hours). Shop-scoped members (shop-admin/shop-user)
+// don't manage this — it mirrors the product-profile pattern, where only
+// the platform's own admin edits this kind of metadata.
+func (s *ShopService) UpdateProfile(ctx context.Context, caller shopassign.Caller, shopID string, in repository.ShopProfileUpdate) (*models.Shop, error) {
+	if caller.SystemRole != models.SystemRoleSuperadmin {
+		return nil, ErrForbidden
+	}
+	if err := s.repo.UpdateProfile(ctx, shopID, in); err != nil {
+		return nil, err
+	}
+	return s.repo.GetByID(ctx, shopID)
 }
