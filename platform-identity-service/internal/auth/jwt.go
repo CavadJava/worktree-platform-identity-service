@@ -27,6 +27,17 @@ func NewJWTManager(secret string, ttlMinutes int) *JWTManager {
 	}
 }
 
+// SetTTL updates the duration used by every Generate call from this point
+// on — lets the token lifetime be changed at runtime (e.g. from an
+// admin-editable setting) without restarting the process. Safe to call
+// concurrently with Generate/Verify since it only ever replaces the whole
+// field, never partially mutates it, but two SetTTL calls racing each
+// other could interleave; callers only expect eventual consistency here,
+// not a strict ordering guarantee.
+func (m *JWTManager) SetTTL(ttlMinutes int) {
+	m.ttl = time.Duration(ttlMinutes) * time.Minute
+}
+
 func (m *JWTManager) Generate(userID, systemRole string) (string, time.Time, error) {
 	expiresAt := time.Now().Add(m.ttl)
 	claims := Claims{

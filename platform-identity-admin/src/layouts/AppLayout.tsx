@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Drawer, Grid, Layout, Menu, Space } from 'antd';
 import type { MenuProps } from 'antd';
-import { AppstoreOutlined, MenuOutlined, ShoppingOutlined, TeamOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, MenuOutlined, SettingOutlined, ShoppingOutlined, TeamOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
@@ -29,6 +29,7 @@ export function AppLayout() {
         { key: '/shops', icon: <AppstoreOutlined />, label: 'Shop-lar' },
         { key: '/products', icon: <ShoppingOutlined />, label: 'Product-lar' },
         { key: '/users', icon: <TeamOutlined />, label: 'İstifadəçilər' },
+        { key: '/settings', icon: <SettingOutlined />, label: 'Ayarlar' },
       ]
     : isAdminOrAbove
       ? [{ key: '/products', icon: <ShoppingOutlined />, label: 'Product-lar' }]

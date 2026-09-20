@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -61,7 +63,19 @@ func main() {
 	systemRoleRepo := repository.NewSystemRoleRepository(db)
 	shopRoleRepo := repository.NewShopRoleRepository(db)
 	productAdminRequestRepo := repository.NewProductAdminRequestRepository(db)
+	settingsRepo := repository.NewSettingsRepository(db)
 	jwtManager := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTTTLMinutes)
+
+	// The DB-stored TTL (admin-editable, see SettingsService) is the real
+	// source of truth once it exists — the .env value only matters for a
+	// brand-new deployment before the migration's seed row would apply.
+	// Read it now so a restart doesn't silently revert to the .env
+	// default after a superadmin has changed it via the panel.
+	if storedTTL, err := settingsRepo.Get(context.Background(), "jwt_ttl_minutes"); err == nil {
+		if minutes, convErr := strconv.Atoi(storedTTL); convErr == nil && minutes > 0 {
+			jwtManager.SetTTL(minutes)
+		}
+	}
 
 	authService := service.NewAuthService(userRepo, jwtManager)
 	userService := service.NewUserService(userRepo)
@@ -70,6 +84,7 @@ func main() {
 	productService := service.NewProductService(productRepo, subscriptionRepo, subprojectRepo, productAdminRequestRepo, userRepo, authService)
 	systemRoleService := service.NewSystemRoleService(systemRoleRepo)
 	shopRoleService := service.NewShopRoleService(shopRoleRepo)
+	settingsService := service.NewSettingsService(settingsRepo, jwtManager)
 
 	authHandler := handlers.NewAuthHandler(authService)
 	userHandler := handlers.NewUserHandler(userService, membershipService)
@@ -78,6 +93,7 @@ func main() {
 	productHandler := handlers.NewProductHandler(productService)
 	systemRoleHandler := handlers.NewSystemRoleHandler(systemRoleService)
 	shopRoleHandler := handlers.NewShopRoleHandler(shopRoleService)
+	settingsHandler := handlers.NewSettingsHandler(settingsService)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -122,6 +138,9 @@ func main() {
 			r.Post("/users/{id}/profile", userHandler.UpdateProfile)
 			r.Get("/users/{id}/shops", userHandler.ListMyShops)
 			r.Get("/users/{id}/password", userHandler.GetPlainPassword)
+
+			r.Get("/settings/jwt-ttl", settingsHandler.GetJWTTTL)
+			r.Post("/settings/jwt-ttl", settingsHandler.SetJWTTTL)
 
 			r.Post("/shops/{id}/profile", shopHandler.UpdateProfile)
 			r.Post("/shops/{id}/members", membershipHandler.AddMember)

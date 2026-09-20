@@ -146,6 +146,17 @@ func Migrate(db *sql.DB) error {
 			UNIQUE (user_id, product_id)
 		);
 		ALTER TABLE user_product_subscriptions ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';
+
+		-- Generic key/value store for admin-editable runtime settings —
+		-- starts with just the JWT token lifetime, but the shape supports
+		-- adding more settings later without another migration.
+		CREATE TABLE IF NOT EXISTS settings (
+			key TEXT PRIMARY KEY,
+			value TEXT NOT NULL,
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		);
+		INSERT INTO settings (key, value) VALUES ('jwt_ttl_minutes', '43200')
+		ON CONFLICT (key) DO NOTHING;
 	`)
 	if err != nil {
 		return fmt.Errorf("migrate: %w", err)

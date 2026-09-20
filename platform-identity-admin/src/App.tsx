@@ -10,6 +10,7 @@ import { ShopsPage } from './pages/ShopsPage';
 import { ShopMembersPage } from './pages/ShopMembersPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { UsersPage } from './pages/UsersPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false } } });
 
@@ -42,6 +43,7 @@ export function App() {
                 <Route element={<RequireSuperadmin />}>
                   <Route path="/shops" element={<ShopsPage />} />
                   <Route path="/users" element={<UsersPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
                 </Route>
               </Route>
             </Route>
