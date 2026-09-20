@@ -15,8 +15,8 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.Port != "8095" {
 		t.Errorf("expected default port 8095, got %s", cfg.Port)
 	}
-	if cfg.JWTTTLMinutes != 60*24 {
-		t.Errorf("expected default JWT TTL 1440, got %d", cfg.JWTTTLMinutes)
+	if cfg.JWTTTLMinutes != 60*24*30 {
+		t.Errorf("expected default JWT TTL 43200 (30 days), got %d", cfg.JWTTTLMinutes)
 	}
 }
 

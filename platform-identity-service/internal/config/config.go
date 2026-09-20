@@ -43,7 +43,7 @@ func Load() (*Config, error) {
 		DBName:             getEnv("DB_NAME", "postgres"),
 		DBSSLMode:          getEnv("DB_SSLMODE", "disable"),
 		JWTSecret:          jwtSecret,
-		JWTTTLMinutes:      getEnvInt("JWT_TTL_MINUTES", 60*24),
+		JWTTTLMinutes:      getEnvInt("JWT_TTL_MINUTES", 60*24*30),
 		SuperadminUsername: getEnv("SUPERADMIN_USERNAME", "superadmin"),
 		SuperadminPassword: getEnv("SUPERADMIN_PASSWORD", "superadmin-dev-password"),
 		Port:               getEnv("PORT", "8095"),
