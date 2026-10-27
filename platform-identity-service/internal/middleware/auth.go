@@ -14,6 +14,7 @@ import (
 type contextKey string
 
 const callerKey contextKey = "caller"
+const claimsKey contextKey = "claims"
 
 // RequireAuth verifies the token locally, then re-checks the caller's
 // current status in the database — a status change (e.g. an admin
@@ -56,6 +57,11 @@ func RequireAuth(jwt *auth.JWTManager, userRepo *repository.UserRepository) func
 func CallerFromContext(ctx context.Context) (shopassign.Caller, bool) {
 	caller, ok := ctx.Value(callerKey).(shopassign.Caller)
 	return caller, ok
+}
+
+func ClaimsFromContext(ctx context.Context) (*auth.Claims, bool) {
+	claims, ok := ctx.Value(claimsKey).(*auth.Claims)
+	return claims, ok
 }
 
 func writeAuthError(w http.ResponseWriter, status int, code, message string) {
