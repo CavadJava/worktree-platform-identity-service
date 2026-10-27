@@ -147,6 +147,12 @@ func Migrate(db *sql.DB) error {
 		);
 		ALTER TABLE user_product_subscriptions ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';
 
+		CREATE TABLE IF NOT EXISTS token_revocations (
+			jti        TEXT PRIMARY KEY,
+			revoked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			expires_at TIMESTAMPTZ NOT NULL
+		);
+
 		-- Generic key/value store for admin-editable runtime settings —
 		-- starts with just the JWT token lifetime, but the shape supports
 		-- adding more settings later without another migration.

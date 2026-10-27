@@ -565,3 +565,36 @@ func TestProductAdminRequestRepository_CreateListDecide(t *testing.T) {
 		t.Fatal("expected no pending request after it was decided")
 	}
 }
+
+func TestTokenRevocationRepository_RevokeAndIsRevoked(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+	repo := NewTokenRevocationRepository(db)
+
+	jti := uuid.NewString()
+
+	revoked, err := repo.IsRevoked(context.Background(), jti)
+	if err != nil {
+		t.Fatalf("IsRevoked (before revoke) failed: %v", err)
+	}
+	if revoked {
+		t.Fatal("expected a never-revoked jti to report false")
+	}
+
+	if err := repo.Revoke(context.Background(), jti, time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("Revoke failed: %v", err)
+	}
+
+	revoked, err = repo.IsRevoked(context.Background(), jti)
+	if err != nil {
+		t.Fatalf("IsRevoked (after revoke) failed: %v", err)
+	}
+	if !revoked {
+		t.Fatal("expected a revoked jti to report true")
+	}
+
+	// Revoking the same jti twice must not error (e.g. a retried logout call).
+	if err := repo.Revoke(context.Background(), jti, time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("second Revoke on the same jti failed: %v", err)
+	}
+}
