@@ -45,6 +45,7 @@ func testRouter(t *testing.T) (chi.Router, *sql.DB) {
 	userRepo := repository.NewUserRepository(db)
 	shopRepo := repository.NewShopRepository(db)
 	membershipRepo := repository.NewShopMembershipRepository(db)
+	tokenRevocationRepo := repository.NewTokenRevocationRepository(db)
 	jwtManager := auth.NewJWTManager("handler-test-secret", 60)
 
 	authSvc := service.NewAuthService(userRepo, jwtManager)
@@ -62,7 +63,7 @@ func testRouter(t *testing.T) (chi.Router, *sql.DB) {
 	r.Post("/api/v1/auth/login", authHandler.Login)
 	r.Post("/api/v1/shops", shopHandler.Create)
 	r.Group(func(r chi.Router) {
-		r.Use(appmiddleware.RequireAuth(jwtManager, userRepo))
+		r.Use(appmiddleware.RequireAuth(jwtManager, userRepo, tokenRevocationRepo))
 		r.Get("/api/v1/users/{id}", userHandler.Get)
 		r.Get("/api/v1/users", userHandler.ListAll)
 		r.Post("/api/v1/shops/{id}/members", membershipHandler.AddMember)

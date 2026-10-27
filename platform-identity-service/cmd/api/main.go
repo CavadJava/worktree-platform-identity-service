@@ -64,6 +64,7 @@ func main() {
 	shopRoleRepo := repository.NewShopRoleRepository(db)
 	productAdminRequestRepo := repository.NewProductAdminRequestRepository(db)
 	settingsRepo := repository.NewSettingsRepository(db)
+	tokenRevocationRepo := repository.NewTokenRevocationRepository(db)
 	jwtManager := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTTTLMinutes)
 
 	// The DB-stored TTL (admin-editable, see SettingsService) is the real
@@ -127,7 +128,7 @@ func main() {
 		r.Post("/auth/login", authHandler.Login)
 
 		r.Group(func(r chi.Router) {
-			r.Use(appmiddleware.RequireAuth(jwtManager, userRepo))
+			r.Use(appmiddleware.RequireAuth(jwtManager, userRepo, tokenRevocationRepo))
 
 			r.Get("/users/{id}", userHandler.Get)
 			r.Get("/users", userHandler.ListAll)

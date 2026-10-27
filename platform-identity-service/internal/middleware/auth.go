@@ -21,7 +21,7 @@ const claimsKey contextKey = "claims"
 // deactivating a user) must take effect on the user's very next request,
 // not just at their next login, so this cannot rely on the JWT's claims
 // alone.
-func RequireAuth(jwt *auth.JWTManager, userRepo *repository.UserRepository) func(http.Handler) http.Handler {
+func RequireAuth(jwt *auth.JWTManager, userRepo *repository.UserRepository, revocationRepo *repository.TokenRevocationRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			header := r.Header.Get("Authorization")
@@ -37,6 +37,16 @@ func RequireAuth(jwt *auth.JWTManager, userRepo *repository.UserRepository) func
 				return
 			}
 
+			revoked, err := revocationRepo.IsRevoked(r.Context(), claims.JTI)
+			if err != nil {
+				writeAuthError(w, http.StatusInternalServerError, "internal_error", "failed to verify token")
+				return
+			}
+			if revoked {
+				writeAuthError(w, http.StatusUnauthorized, "unauthorized", "token has been revoked")
+				return
+			}
+
 			user, err := userRepo.GetByID(r.Context(), claims.UserID)
 			if err != nil {
 				writeAuthError(w, http.StatusUnauthorized, "unauthorized", "invalid or expired token")
@@ -49,6 +59,7 @@ func RequireAuth(jwt *auth.JWTManager, userRepo *repository.UserRepository) func
 
 			caller := shopassign.Caller{UserID: claims.UserID, SystemRole: claims.SystemRole}
 			ctx := context.WithValue(r.Context(), callerKey, caller)
+			ctx = context.WithValue(ctx, claimsKey, claims)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

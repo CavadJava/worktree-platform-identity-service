@@ -47,6 +47,7 @@ func testProductRouter(t *testing.T) (chi.Router, *sql.DB, *auth.JWTManager) {
 	jwtManager := auth.NewJWTManager("product-handler-test-secret", 60)
 
 	reqRepo := repository.NewProductAdminRequestRepository(db)
+	tokenRevocationRepo := repository.NewTokenRevocationRepository(db)
 	authService := service.NewAuthService(userRepo, jwtManager)
 	productService := service.NewProductService(productRepo, subRepo, subprojRepo, reqRepo, userRepo, authService)
 	productHandler := NewProductHandler(productService)
@@ -57,7 +58,7 @@ func testProductRouter(t *testing.T) (chi.Router, *sql.DB, *auth.JWTManager) {
 	r.Get("/api/v1/products/{id}/subprojects", productHandler.ListSubprojects)
 	r.Post("/api/v1/auth/login", authHandler.Login)
 	r.Group(func(r chi.Router) {
-		r.Use(appmiddleware.RequireAuth(jwtManager, userRepo))
+		r.Use(appmiddleware.RequireAuth(jwtManager, userRepo, tokenRevocationRepo))
 		r.Post("/api/v1/products", productHandler.Create)
 		r.Post("/api/v1/products/{id}/users", productHandler.CreateUserAndSubscribe)
 		r.Post("/api/v1/products/{id}/profile", productHandler.UpdateProfile)
