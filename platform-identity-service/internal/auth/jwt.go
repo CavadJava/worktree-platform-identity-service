@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 var ErrInvalidToken = errors.New("invalid or expired token")
@@ -12,6 +13,7 @@ var ErrInvalidToken = errors.New("invalid or expired token")
 type Claims struct {
 	UserID     string `json:"user_id"`
 	SystemRole string `json:"system_role"`
+	JTI        string `json:"jti"`
 	jwt.RegisteredClaims
 }
 
@@ -40,10 +42,13 @@ func (m *JWTManager) SetTTL(ttlMinutes int) {
 
 func (m *JWTManager) Generate(userID, systemRole string) (string, time.Time, error) {
 	expiresAt := time.Now().Add(m.ttl)
+	jti := uuid.NewString()
 	claims := Claims{
 		UserID:     userID,
 		SystemRole: systemRole,
+		JTI:        jti,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
