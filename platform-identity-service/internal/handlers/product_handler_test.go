@@ -51,7 +51,7 @@ func testProductRouter(t *testing.T) (chi.Router, *sql.DB, *auth.JWTManager) {
 	authService := service.NewAuthService(userRepo, jwtManager)
 	productService := service.NewProductService(productRepo, subRepo, subprojRepo, reqRepo, userRepo, authService)
 	productHandler := NewProductHandler(productService)
-	authHandler := NewAuthHandler(authService)
+	authHandler := NewAuthHandler(authService, tokenRevocationRepo)
 
 	r := chi.NewRouter()
 	r.Get("/api/v1/products", productHandler.List)

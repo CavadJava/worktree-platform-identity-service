@@ -87,7 +87,7 @@ func main() {
 	shopRoleService := service.NewShopRoleService(shopRoleRepo)
 	settingsService := service.NewSettingsService(settingsRepo, jwtManager)
 
-	authHandler := handlers.NewAuthHandler(authService)
+	authHandler := handlers.NewAuthHandler(authService, tokenRevocationRepo)
 	userHandler := handlers.NewUserHandler(userService, membershipService)
 	shopHandler := handlers.NewShopHandler(shopService)
 	membershipHandler := handlers.NewShopMembershipHandler(membershipService)
@@ -139,6 +139,7 @@ func main() {
 			r.Post("/users/{id}/profile", userHandler.UpdateProfile)
 			r.Get("/users/{id}/shops", userHandler.ListMyShops)
 			r.Get("/users/{id}/password", userHandler.GetPlainPassword)
+			r.Post("/auth/logout", authHandler.Logout)
 
 			r.Get("/settings/jwt-ttl", settingsHandler.GetJWTTTL)
 			r.Post("/settings/jwt-ttl", settingsHandler.SetJWTTTL)

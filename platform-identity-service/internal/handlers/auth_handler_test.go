@@ -53,7 +53,7 @@ func testRouter(t *testing.T) (chi.Router, *sql.DB) {
 	shopSvc := service.NewShopService(shopRepo)
 	membershipSvc := service.NewShopMembershipService(membershipRepo, userRepo, shopRepo, authSvc, userSvc)
 
-	authHandler := NewAuthHandler(authSvc)
+	authHandler := NewAuthHandler(authSvc, tokenRevocationRepo)
 	userHandler := NewUserHandler(userSvc, membershipSvc)
 	shopHandler := NewShopHandler(shopSvc)
 	membershipHandler := NewShopMembershipHandler(membershipSvc)
@@ -67,6 +67,7 @@ func testRouter(t *testing.T) (chi.Router, *sql.DB) {
 		r.Get("/api/v1/users/{id}", userHandler.Get)
 		r.Get("/api/v1/users", userHandler.ListAll)
 		r.Post("/api/v1/shops/{id}/members", membershipHandler.AddMember)
+		r.Post("/api/v1/auth/logout", authHandler.Logout)
 	})
 
 	t.Cleanup(func() { db.Close() })
@@ -236,5 +237,90 @@ func TestRequireAuth_RejectsTokenAfterUserDeactivated(t *testing.T) {
 	rec = doJSON(t, r, http.MethodGet, "/api/v1/users/"+userID, token, nil)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("get user after deactivation: expected 401, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestLogout_RevokesTokenForThisSessionOnly proves the core point of this
+// endpoint: logging out one token must reject that SAME token on its next
+// use, while leaving a second, independently-issued token for the same
+// user completely unaffected (e.g. the same account logged in on a second
+// browser).
+func TestLogout_RevokesTokenForThisSessionOnly(t *testing.T) {
+	r, _ := testRouter(t)
+
+	username := "logout-" + uuid.NewString()
+	rec := doJSON(t, r, http.MethodPost, "/api/v1/auth/register", "", map[string]string{
+		"name": "Logout Me", "username": username, "email": uuid.NewString() + "@example.com", "password": "password123",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("register: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var userEnv struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	json.NewDecoder(rec.Body).Decode(&userEnv)
+	userID := userEnv.Data.ID
+
+	login := func() string {
+		rec := doJSON(t, r, http.MethodPost, "/api/v1/auth/login", "", map[string]string{
+			"identifier": username, "password": "password123",
+		})
+		if rec.Code != http.StatusOK {
+			t.Fatalf("login: expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var loginEnv struct {
+			Data struct {
+				Token string `json:"token"`
+			} `json:"data"`
+		}
+		json.NewDecoder(rec.Body).Decode(&loginEnv)
+		if loginEnv.Data.Token == "" {
+			t.Fatal("expected non-empty token")
+		}
+		return loginEnv.Data.Token
+	}
+
+	// Two independent logins, standing in for the same account signed in on
+	// two separate browsers/devices.
+	tokenA := login()
+	tokenB := login()
+
+	// Both work before either is logged out.
+	rec = doJSON(t, r, http.MethodGet, "/api/v1/users/"+userID, tokenA, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("tokenA before logout: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	rec = doJSON(t, r, http.MethodGet, "/api/v1/users/"+userID, tokenB, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("tokenB before logout: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Log out tokenA only.
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/auth/logout", tokenA, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("logout: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// tokenA is now rejected...
+	rec = doJSON(t, r, http.MethodGet, "/api/v1/users/"+userID, tokenA, nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("tokenA after logout: expected 401, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// ...but tokenB, the OTHER session for the same user, is untouched.
+	rec = doJSON(t, r, http.MethodGet, "/api/v1/users/"+userID, tokenB, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("tokenB after tokenA's logout: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// A second logout call with the now-already-revoked tokenA fails at
+	// RequireAuth itself (401) before Logout's own handler body ever runs —
+	// there is nothing left to revoke, and the row already exists from the
+	// first call.
+	rec = doJSON(t, r, http.MethodPost, "/api/v1/auth/logout", tokenA, nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("second logout with revoked token: expected 401, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

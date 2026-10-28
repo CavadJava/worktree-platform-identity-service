@@ -7,15 +7,17 @@ import (
 
 	"platform-identity-service/internal/middleware"
 	"platform-identity-service/internal/models"
+	"platform-identity-service/internal/repository"
 	"platform-identity-service/internal/service"
 )
 
 type AuthHandler struct {
-	svc *service.AuthService
+	svc            *service.AuthService
+	revocationRepo *repository.TokenRevocationRepository
 }
 
-func NewAuthHandler(svc *service.AuthService) *AuthHandler {
-	return &AuthHandler{svc: svc}
+func NewAuthHandler(svc *service.AuthService, revocationRepo *repository.TokenRevocationRepository) *AuthHandler {
+	return &AuthHandler{svc: svc, revocationRepo: revocationRepo}
 }
 
 type registerRequest struct {
@@ -177,4 +179,25 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, loginResponse{Token: token, ExpiresAt: expiresAt.Format(timeFormat)})
+}
+
+// Logout godoc
+// @Summary      Revoke the current session's token
+// @Description  Revokes only the bearer token used on THIS request — any other active sessions for the same user (e.g. logged in on a second device) are unaffected.
+// @Tags         auth
+// @Security     BearerAuth
+// @Success      200 {object} map[string]bool
+// @Failure      401 {object} map[string]string
+// @Router       /auth/logout [post]
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.ClaimsFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing session")
+		return
+	}
+	if err := h.revocationRepo.Revoke(r.Context(), claims.JTI, claims.ExpiresAt.Time); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to revoke token")
+		return
+	}
+	writeJSON(w, http.StatusOK, nil)
 }
